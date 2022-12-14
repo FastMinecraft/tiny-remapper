@@ -1096,9 +1096,9 @@ public class TinyRemapper {
 						for (ClassInstance parent : member.cls.parents) {
 							queue.enqueue(parent);
 						}
-						ClassInstance cls;
 
-						while ((cls = queue.dequeue()) != null) {
+						while (!queue.isEmpty()) {
+							ClassInstance cls = queue.dequeue();
 							mappingName = mappings.get(cls.getName() + "/" + member.getId());
 							if (mappingName != null) break;
 

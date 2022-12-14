@@ -685,10 +685,11 @@ public final class ClassInstance implements TrClass {
 		visited.add(this);
 		ObjectArrayList<MemberInstance> matchedMethods = new ObjectArrayList<>();
 		boolean hasNonAbstract = false;
-		cls = this;
 
-		do {
-			for (ClassInstance parent : cls.parents) {
+		queue.enqueue(this);
+		while(!queue.isEmpty()) {
+			ClassInstance classInstance = queue.dequeue();
+			for (ClassInstance parent : classInstance.parents) {
 				if (!visited.add(parent)) continue;
 
 				if (parent.isInterface()) {
@@ -703,7 +704,7 @@ public final class ClassInstance implements TrClass {
 
 				queue.enqueue(parent);
 			}
-		} while ((cls = queue.dequeue()) != null);
+		};
 
 		if (hasNonAbstract && matchedMethods.size() > 1) {
 			// try to select first maximally-specific superinterface method (doesn't matter if it's the only one, jvm spec allows arbitrary choice otherwise)
@@ -769,10 +770,11 @@ public final class ClassInstance implements TrClass {
 		visited.add(this);
 		Object2ObjectMap<String, ObjectList<TrMethod>> matchedMethodsMap = new Object2ObjectOpenHashMap<>();
 		boolean hasNonAbstract = false;
-		cls = this;
 
-		do {
-			for (ClassInstance parent : cls.parents) {
+		queue.enqueue(this);
+		while (!queue.isEmpty()) {
+			ClassInstance classInstance = queue.dequeue();
+			for (ClassInstance parent : classInstance.parents) {
 				if (!visited.add(parent)) continue;
 
 				if (parent.isInterface()) {
@@ -787,7 +789,7 @@ public final class ClassInstance implements TrClass {
 
 				queue.enqueue(parent);
 			}
-		} while ((cls = queue.dequeue()) != null);
+		}
 
 		mapLoop: for (ObjectList<TrMethod> matchedMethods : matchedMethodsMap.values()) {
 			if (matchedMethods.isEmpty()) continue;
