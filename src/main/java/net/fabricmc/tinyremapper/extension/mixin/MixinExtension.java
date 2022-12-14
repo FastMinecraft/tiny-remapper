@@ -18,16 +18,8 @@
 
 package net.fabricmc.tinyremapper.extension.mixin;
 
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.Consumer;
-
-import org.objectweb.asm.ClassVisitor;
-
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.fabricmc.tinyremapper.TinyRemapper;
 import net.fabricmc.tinyremapper.TinyRemapper.Builder;
 import net.fabricmc.tinyremapper.api.TrClass;
@@ -37,13 +29,18 @@ import net.fabricmc.tinyremapper.extension.mixin.common.Logger.Level;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.CommonData;
 import net.fabricmc.tinyremapper.extension.mixin.hard.HardTargetMixinClassVisitor;
 import net.fabricmc.tinyremapper.extension.mixin.soft.SoftTargetMixinClassVisitor;
+import org.objectweb.asm.ClassVisitor;
+
+import java.util.EnumSet;
+import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * A extension for remapping mixin annotation.
  */
 public class MixinExtension implements TinyRemapper.Extension {
 	private final Logger logger;
-	private final Map<Integer, List<Consumer<CommonData>>> tasks;
+	private final Int2ObjectOpenHashMap<ObjectArrayList<Consumer<CommonData>>> tasks;
 	private final Set<AnnotationTarget> targets;
 
 	public enum AnnotationTarget {
@@ -76,7 +73,7 @@ public class MixinExtension implements TinyRemapper.Extension {
 
 	public MixinExtension(Set<AnnotationTarget> targets, Logger.Level logLevel) {
 		this.logger = new Logger(logLevel);
-		this.tasks = new HashMap<>();
+		this.tasks = new Int2ObjectOpenHashMap<>();
 		this.targets = targets;
 	}
 
@@ -95,7 +92,7 @@ public class MixinExtension implements TinyRemapper.Extension {
 	 * Hard-target: Shadow, Overwrite, Accessor, Invoker, Implements.
 	 */
 	private ClassVisitor analyzeVisitor(int mrjVersion, String className, ClassVisitor next) {
-		tasks.putIfAbsent(mrjVersion, new ArrayList<>());
+		tasks.putIfAbsent(mrjVersion, new ObjectArrayList<>());
 		return new HardTargetMixinClassVisitor(tasks.get(mrjVersion), next);
 	}
 

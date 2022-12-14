@@ -18,26 +18,21 @@
 
 package net.fabricmc.tinyremapper.extension.mixin.soft.annotation.injection;
 
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import net.fabricmc.tinyremapper.api.TrClass;
+import net.fabricmc.tinyremapper.api.TrMember;
+import net.fabricmc.tinyremapper.extension.mixin.common.IMappable;
+import net.fabricmc.tinyremapper.extension.mixin.common.ResolveUtility;
+import net.fabricmc.tinyremapper.extension.mixin.common.data.*;
+import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.FirstPassAnnotationVisitor;
+import net.fabricmc.tinyremapper.extension.mixin.soft.data.MemberInfo;
+import org.objectweb.asm.AnnotationVisitor;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-
-import org.objectweb.asm.AnnotationVisitor;
-
-import net.fabricmc.tinyremapper.api.TrClass;
-import net.fabricmc.tinyremapper.api.TrMember;
-import net.fabricmc.tinyremapper.extension.mixin.common.IMappable;
-import net.fabricmc.tinyremapper.extension.mixin.common.ResolveUtility;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.Annotation;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.AnnotationElement;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.CommonData;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.Constant;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.Message;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.Pair;
-import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.FirstPassAnnotationVisitor;
-import net.fabricmc.tinyremapper.extension.mixin.soft.data.MemberInfo;
 
 /**
  * If the {@code method} element does not contain a name, then do not remap it; If the
@@ -47,9 +42,9 @@ import net.fabricmc.tinyremapper.extension.mixin.soft.data.MemberInfo;
 class CommonInjectionAnnotationVisitor extends FirstPassAnnotationVisitor {
 	private final CommonData data;
 	private final AnnotationVisitor delegate;
-	private final List<String> targets;
+	private final ObjectList<String> targets;
 
-	CommonInjectionAnnotationVisitor(String descriptor, CommonData data, AnnotationVisitor delegate, boolean remap, List<String> targets) {
+	CommonInjectionAnnotationVisitor(String descriptor, CommonData data, AnnotationVisitor delegate, boolean remap, ObjectList<String> targets) {
 		super(descriptor, remap);
 
 		this.data = Objects.requireNonNull(data);

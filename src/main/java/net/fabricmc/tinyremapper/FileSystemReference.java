@@ -18,18 +18,14 @@
 
 package net.fabricmc.tinyremapper;
 
+import it.unimi.dsi.fastutil.objects.*;
+
 import java.io.Closeable;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystemAlreadyExistsException;
-import java.nio.file.FileSystemNotFoundException;
-import java.nio.file.FileSystems;
-import java.nio.file.Path;
+import java.nio.file.*;
 import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -79,10 +75,10 @@ public final class FileSystemReference implements Closeable {
 			}
 
 			FileSystemReference ret = new FileSystemReference(fs);
-			Set<FileSystemReference> refs = openFsMap.get(fs);
+			ReferenceSet<FileSystemReference> refs = openFsMap.get(fs);
 
 			if (refs == null) {
-				refs = Collections.newSetFromMap(new IdentityHashMap<>());
+				refs = new ReferenceOpenHashSet<>();
 				openFsMap.put(fs, refs);
 				if (!opened) refs.add(null);
 			} else if (opened) {
@@ -138,12 +134,12 @@ public final class FileSystemReference implements Closeable {
 	@Override
 	public String toString() {
 		synchronized (openFsMap) {
-			Set<FileSystemReference> refs = openFsMap.getOrDefault(fileSystem, Collections.emptySet());
+			ReferenceSet<FileSystemReference> refs = openFsMap.getOrDefault(fileSystem, ReferenceSets.emptySet());
 			return String.format("%s=%dx,%s", fileSystem, refs.size(), refs.contains(null) ? "existing" : "new");
 		}
 	}
 
-	private static final Map<FileSystem, Set<FileSystemReference>> openFsMap = new IdentityHashMap<>();
+	private static final Reference2ObjectMap<FileSystem, ReferenceSet<FileSystemReference>> openFsMap = new Reference2ObjectOpenHashMap<>();
 
 	private final FileSystem fileSystem;
 	private volatile boolean closed;

@@ -18,40 +18,35 @@
 
 package net.fabricmc.tinyremapper.extension.mixin.hard;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
-
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
+import net.fabricmc.tinyremapper.extension.mixin.common.MapUtility;
+import net.fabricmc.tinyremapper.extension.mixin.common.data.*;
+import net.fabricmc.tinyremapper.extension.mixin.hard.annotation.ImplementsAnnotationVisitor;
+import net.fabricmc.tinyremapper.extension.mixin.hard.annotation.MixinAnnotationVisitor;
+import net.fabricmc.tinyremapper.extension.mixin.hard.data.SoftInterface;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.MethodVisitor;
 
-import net.fabricmc.tinyremapper.extension.mixin.common.MapUtility;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.Annotation;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.CommonData;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.Constant;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.MxClass;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.MxMember;
-import net.fabricmc.tinyremapper.extension.mixin.hard.annotation.ImplementsAnnotationVisitor;
-import net.fabricmc.tinyremapper.extension.mixin.hard.annotation.MixinAnnotationVisitor;
-import net.fabricmc.tinyremapper.extension.mixin.hard.data.SoftInterface;
+import java.util.Collections;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 public class HardTargetMixinClassVisitor extends ClassVisitor {
-	private final List<Consumer<CommonData>> tasks;
+	private final ObjectArrayList<Consumer<CommonData>> tasks;
 	private MxClass _class;
 
 	// @Mixin
 	private final AtomicBoolean remap = new AtomicBoolean();
-	private final List<String> targets = new ArrayList<>();
+	private final ObjectArrayList<String> targets = new ObjectArrayList<>();
 
 	// @Implements
-	private final List<SoftInterface> interfaces = new ArrayList<>();
+	private final ObjectArrayList<SoftInterface> interfaces = new ObjectArrayList<>();
 
-	public HardTargetMixinClassVisitor(List<Consumer<CommonData>> tasks, ClassVisitor delegate) {
+	public HardTargetMixinClassVisitor(ObjectArrayList<Consumer<CommonData>> tasks, ClassVisitor delegate) {
 		super(Constant.ASM_VERSION, delegate);
 		this.tasks = Objects.requireNonNull(tasks);
 	}
@@ -105,7 +100,7 @@ public class HardTargetMixinClassVisitor extends ClassVisitor {
 		if (targets.isEmpty()) {
 			return mv;
 		} else {
-			return new HardTargetMixinMethodVisitor(tasks, mv, method, remap.get(), Collections.unmodifiableList(targets));
+			return new HardTargetMixinMethodVisitor(tasks, mv, method, remap.get(), ObjectLists.unmodifiable(targets));
 		}
 	}
 }

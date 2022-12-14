@@ -18,6 +18,13 @@
 
 package net.fabricmc.tinyremapper;
 
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ObjectSet;
+import it.unimi.dsi.fastutil.objects.ObjectSets;
+import net.fabricmc.tinyremapper.TinyRemapper.LinkedMethodPropagation;
+import net.fabricmc.tinyremapper.extension.mixin.MixinExtension;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -25,25 +32,17 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.regex.Pattern;
-
-import net.fabricmc.tinyremapper.TinyRemapper.LinkedMethodPropagation;
-import net.fabricmc.tinyremapper.extension.mixin.MixinExtension;
 
 public class Main {
 	public static void main(String[] rawArgs) {
-		List<String> args = new ArrayList<String>(rawArgs.length);
+		ObjectArrayList<String> args = new ObjectArrayList<>(rawArgs.length);
 		boolean ignoreFieldDesc = false;
 		boolean propagatePrivate = false;
 		LinkedMethodPropagation propagateBridges = LinkedMethodPropagation.DISABLED;
 		boolean removeFrames = false;
-		Set<String> forcePropagation = Collections.emptySet();
+		ObjectSet<String> forcePropagation = ObjectSets.emptySet();
 		File forcePropagationFile = null;
 		boolean ignoreConflicts = false;
 		boolean checkPackageAccess = false;
@@ -179,7 +178,7 @@ public class Main {
 		}
 
 		if (forcePropagationFile != null) {
-			forcePropagation = new HashSet<>();
+			forcePropagation = new ObjectOpenHashSet<>();
 
 			if (!forcePropagationFile.canRead()) {
 				System.out.println("Can't read forcePropagation file "+forcePropagationFile+".");

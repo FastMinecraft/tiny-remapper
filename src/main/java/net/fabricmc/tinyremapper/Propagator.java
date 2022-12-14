@@ -18,16 +18,14 @@
 
 package net.fabricmc.tinyremapper;
 
-import java.util.Set;
-
-import org.objectweb.asm.Opcodes;
-
+import it.unimi.dsi.fastutil.objects.ReferenceSet;
 import net.fabricmc.tinyremapper.TinyRemapper.Direction;
 import net.fabricmc.tinyremapper.TinyRemapper.LinkedMethodPropagation;
 import net.fabricmc.tinyremapper.api.TrMember;
+import org.objectweb.asm.Opcodes;
 
 final class Propagator {
-	static void propagate(MemberInstance member, String memberId, String nameDst, Set<ClassInstance> visitedUp, Set<ClassInstance> visitedDown) {
+	static void propagate(MemberInstance member, String memberId, String nameDst, ReferenceSet<ClassInstance> visitedUp, ReferenceSet<ClassInstance> visitedDown) {
 		ClassInstance cls = member.cls;
 		boolean isVirtual = member.isVirtual();
 

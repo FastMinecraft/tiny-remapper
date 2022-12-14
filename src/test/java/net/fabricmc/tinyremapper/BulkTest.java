@@ -18,6 +18,12 @@
 
 package net.fabricmc.tinyremapper;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectIterator;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -25,14 +31,9 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 public class BulkTest {
 	@Test
@@ -44,7 +45,7 @@ public class BulkTest {
 					.withMappings(TinyUtils.createTinyMappingProvider(reader, "intermediary", "named"))
 					.build();
 
-			Map<Path, InputTag> files = new HashMap<>();
+			Object2ObjectOpenHashMap<Path, InputTag> files = new Object2ObjectOpenHashMap<>();
 
 			try (ZipInputStream zis = new ZipInputStream(getInputStream("integration/bulk/fabric-api-0.35.1+1.17.jar"))) {
 				ZipEntry entry;
@@ -61,16 +62,23 @@ public class BulkTest {
 				}
 			}
 
-			for (Map.Entry<Path, InputTag> entry : files.entrySet()) {
+			ObjectIterator<Object2ObjectMap.Entry<Path, InputTag>> iter1 = files.object2ObjectEntrySet().fastIterator();
+			while (iter1.hasNext()) {
+				Object2ObjectMap.Entry<Path, InputTag> entry = iter1.next();
 				remapper.readInputsAsync(entry.getValue(), entry.getKey());
 			}
 
 			//remapper.readClassPathAsync(Paths.get("/home/m/.gradle/caches/fabric-loom/minecraft-1.17-intermediary-net.fabricmc.yarn-1.17+build.6-v2.jar"));
 
-			for (Map.Entry<Path, InputTag> entry : files.entrySet()) {
+			ObjectIterator<Object2ObjectMap.Entry<Path, InputTag>> iter2 = files.object2ObjectEntrySet().fastIterator();
+			while (iter2.hasNext()) {
+				Object2ObjectMap.Entry<Path, InputTag> entry = iter2.next();
 				Path file = entry.getKey();
 
-				try (OutputConsumerPath consumer = new OutputConsumerPath.Builder(tmpDir.resolve(file.getFileName().toString().replace(".jar", "-out.jar"))).build()) {
+				try (OutputConsumerPath consumer = new OutputConsumerPath.Builder(tmpDir.resolve(file.getFileName().toString().replace(
+					".jar",
+					"-out.jar"
+				))).build()) {
 					remapper.apply(consumer, entry.getValue());
 				}
 			}

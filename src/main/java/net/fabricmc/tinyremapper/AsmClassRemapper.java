@@ -18,35 +18,21 @@
 
 package net.fabricmc.tinyremapper;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Objects;
-import java.util.function.Function;
-import java.util.regex.Pattern;
-
-import javax.lang.model.SourceVersion;
-
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.FieldVisitor;
-import org.objectweb.asm.Handle;
-import org.objectweb.asm.Label;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.RecordComponentVisitor;
-import org.objectweb.asm.Type;
+import it.unimi.dsi.fastutil.objects.Object2IntMap;
+import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import net.fabricmc.tinyremapper.api.TrMember;
+import org.objectweb.asm.*;
 import org.objectweb.asm.commons.FieldRemapper;
 import org.objectweb.asm.commons.MethodRemapper;
 import org.objectweb.asm.commons.RecordComponentRemapper;
-import org.objectweb.asm.tree.AbstractInsnNode;
-import org.objectweb.asm.tree.LabelNode;
-import org.objectweb.asm.tree.LocalVariableNode;
-import org.objectweb.asm.tree.MethodNode;
-import org.objectweb.asm.tree.ParameterNode;
+import org.objectweb.asm.tree.*;
 
-import net.fabricmc.tinyremapper.api.TrMember;
+import javax.lang.model.SourceVersion;
+import java.util.Iterator;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.regex.Pattern;
 
 final class AsmClassRemapper extends VisitTrackingClassRemapper {
 	AsmClassRemapper(ClassVisitor cv, AsmRemapper remapper,
@@ -191,6 +177,8 @@ final class AsmClassRemapper extends VisitTrackingClassRemapper {
 			this.owner = owner;
 			this.methodNode = methodNode;
 			this.output = methodVisitor;
+			this.nameCounts = new Object2IntOpenHashMap<>();
+			this.nameCounts.defaultReturnValue(-1);
 			this.checkPackageAccess = checkPackageAccess;
 			this.skipLocalMapping = skipLocalMapping;
 			this.renameInvalidLocals = renameInvalidLocals;
@@ -406,7 +394,7 @@ final class AsmClassRemapper extends VisitTrackingClassRemapper {
 			if (methodNode.localVariables != null
 					|| hasAnyArgs && (methodNode.access & Opcodes.ACC_ABSTRACT) == 0) { // no lvt without method body
 				if (methodNode.localVariables == null) {
-					methodNode.localVariables = new ArrayList<>();
+					methodNode.localVariables = new ObjectArrayList<>();
 				}
 
 				boolean[] argsWritten = new boolean[args.length];
@@ -489,7 +477,7 @@ final class AsmClassRemapper extends VisitTrackingClassRemapper {
 					|| hasAllArgs && args.length > 0 // avoid creating MethodParameters attribute with missing names since they trigger a Kotlin compiler bug
 					|| hasAnyArgs && (methodNode.access & Opcodes.ACC_ABSTRACT) != 0) { // .. unless parameters are the only way to specify args (no method body)
 				if (methodNode.parameters == null) {
-					methodNode.parameters = new ArrayList<>(args.length);
+					methodNode.parameters = new ObjectArrayList<>(args.length);
 				}
 
 				while (methodNode.parameters.size() < args.length) {
@@ -598,7 +586,7 @@ final class AsmClassRemapper extends VisitTrackingClassRemapper {
 			if (incrementLetter) {
 				int index = -1;
 
-				while (nameCounts.putIfAbsent(varName, 1) != null || isJavaKeyword(varName)) {
+				while (nameCounts.putIfAbsent(varName, 1) != -1 || isJavaKeyword(varName)) {
 					if (index < 0) index = getNameIndex(varName, hasPluralS);
 
 					varName = getIndexName(++index, plural);
@@ -616,7 +604,7 @@ final class AsmClassRemapper extends VisitTrackingClassRemapper {
 						return varName; // name does not exist yet, so can return fast here
 					}
 				} else {
-					varName = baseVarName + Integer.toString(count);
+					varName = baseVarName + count;
 				}
 
 				/*
@@ -625,8 +613,8 @@ final class AsmClassRemapper extends VisitTrackingClassRemapper {
 				 * other variable which already has that name, e.g.:
 				 * (MyClass ?, MyClass2 ?, MyClass ?) -> (MyClass myClass, MyClass2 myClass2, !myClass2 is already taken!)
 				 */
-				while (nameCounts.putIfAbsent(varName, 1) != null) {
-					varName = baseVarName + Integer.toString(count++);
+				while (nameCounts.putIfAbsent(varName, 1) != -1) {
+					varName = baseVarName + count++;
 				}
 
 				nameCounts.put(baseVarName, count); // update name count
@@ -675,7 +663,7 @@ final class AsmClassRemapper extends VisitTrackingClassRemapper {
 			return s != null && !s.isEmpty() && SourceVersion.isIdentifier(s)
 					// Ignorable characters cannot be represented in source code,
 					// would be ignored when re-compiled
-					&& !s.codePoints().anyMatch(Character::isIdentifierIgnorable);
+					&& s.codePoints().noneMatch(Character::isIdentifierIgnorable);
 		}
 
 		private static boolean isJavaKeyword(String s) {
@@ -692,7 +680,7 @@ final class AsmClassRemapper extends VisitTrackingClassRemapper {
 		private final String owner;
 		private final MethodNode methodNode;
 		private final MethodVisitor output;
-		private final Map<String, Integer> nameCounts = new HashMap<>();
+		private final Object2IntMap<String> nameCounts;
 		private final boolean checkPackageAccess;
 		private final boolean skipLocalMapping;
 		private final boolean renameInvalidLocals;

@@ -18,15 +18,7 @@
 
 package net.fabricmc.tinyremapper.extension.mixin.hard.annotation;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
-import java.util.function.Consumer;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import org.objectweb.asm.AnnotationVisitor;
-
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.AnnotationElement;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.CommonData;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.Constant;
@@ -34,6 +26,13 @@ import net.fabricmc.tinyremapper.extension.mixin.common.data.MxMember;
 import net.fabricmc.tinyremapper.extension.mixin.hard.util.CamelPrefixString;
 import net.fabricmc.tinyremapper.extension.mixin.hard.util.ConvertibleMappable;
 import net.fabricmc.tinyremapper.extension.mixin.hard.util.IConvertibleString;
+import org.objectweb.asm.AnnotationVisitor;
+
+import java.util.Collection;
+import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * In case of multi-target, if a remap conflict is detected,
@@ -42,14 +41,14 @@ import net.fabricmc.tinyremapper.extension.mixin.hard.util.IConvertibleString;
  * do not lower the first character of the remaining part.
  */
 public class AccessorAnnotationVisitor extends AnnotationVisitor {
-	private final List<Consumer<CommonData>> tasks;
+	private final ObjectList<Consumer<CommonData>> tasks;
 	private final MxMember method;
-	private final List<String> targets;
+	private final ObjectList<String> targets;
 
 	private boolean remap;
 	private boolean isSoftTarget;
 
-	public AccessorAnnotationVisitor(List<Consumer<CommonData>> tasks, AnnotationVisitor delegate, MxMember method, boolean remap, List<String> targets) {
+	public AccessorAnnotationVisitor(ObjectList<Consumer<CommonData>> tasks, AnnotationVisitor delegate, MxMember method, boolean remap, ObjectList<String> targets) {
 		super(Constant.ASM_VERSION, delegate);
 
 		this.tasks = Objects.requireNonNull(tasks);

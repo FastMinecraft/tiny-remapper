@@ -18,64 +18,66 @@
 
 package net.fabricmc.tinyremapper.api;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.function.Predicate;
-
+import it.unimi.dsi.fastutil.objects.ObjectCollection;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
+
+import java.util.function.Predicate;
 
 public interface TrClass {
 	TrEnvironment getEnvironment();
 
 	String getName();
 	String getSuperName();
-	List<String> getInterfaceNames();
+	ObjectList<String> getInterfaceNames();
 	String getSignature();
 	int getAccess();
 
 	TrClass getSuperClass();
-	List<? extends TrClass> getInterfaces();
+	ObjectList<? extends TrClass> getInterfaces();
 
-	Collection<? extends TrClass> getParents();
-	Collection<? extends TrClass> getChildren();
+	ObjectCollection<? extends TrClass> getParents();
+	ObjectCollection<? extends TrClass> getChildren();
 
 	TrField getField(String name, String desc);
 	TrMethod getMethod(String name, String desc);
 
-	Collection<? extends TrField> getFields();
-	Collection<? extends TrMethod> getMethods();
-	Collection<? extends TrMember> getMembers();
+	ObjectCollection<? extends TrField> getFields();
+	ObjectCollection<? extends TrMethod> getMethods();
+	ObjectCollection<? extends TrMember> getMembers();
 
-	Collection<TrField> getFields(String name, String desc, boolean isDescPrefix, Predicate<TrField> filter, Collection<TrField> out);
-	Collection<TrMethod> getMethods(String name, String desc, boolean isDescPrefix, Predicate<TrMethod> filter, Collection<TrMethod> out);
+	ObjectCollection<TrField> getFields(String name, String desc, boolean isDescPrefix, Predicate<TrField> filter, ObjectCollection<TrField> out);
+	ObjectCollection<TrMethod> getMethods(String name, String desc, boolean isDescPrefix, Predicate<TrMethod> filter, ObjectCollection<TrMethod> out);
 
 	TrField resolveField(String name, String desc);
 	TrMethod resolveMethod(String name, String desc);
 
 	/**
 	 * Get fields in the class, including the one inherited from super-class or super-interfaces, satisfy the search query.
-	 * @param name the name of the field. Nullable.
-	 * @param desc the descriptor (or descriptor prefix) of the field. Nullable.
+	 *
+	 * @param name         the name of the field. Nullable.
+	 * @param desc         the descriptor (or descriptor prefix) of the field. Nullable.
 	 * @param isDescPrefix is {@code descPrefix} a full qualified descriptor or a prefix.
-	 * @param filter any additional constraint. Nullable.
-	 * @param out if not {@code null}, then reuse this collection instead of allocate a new one. The behaviour
-	 *            is undefined is the collection is non-empty. Nullable.
+	 * @param filter       any additional constraint. Nullable.
+	 * @param out          if not {@code null}, then reuse this collection instead of allocate a new one. The behaviour
+	 *                     is undefined is the collection is non-empty. Nullable.
 	 * @return the query result.
 	 */
-	Collection<TrField> resolveFields(String name, String desc, boolean isDescPrefix, Predicate<TrField> filter, Collection<TrField> out);
+	ObjectCollection<TrField> resolveFields(String name, String desc, boolean isDescPrefix, Predicate<TrField> filter, ObjectCollection<TrField> out);
 
 	/**
 	 * Get methods in the class, including the one inherited from super-class or super-interfaces, satisfy the search query.
-	 * @param name the name of the method. Nullable.
-	 * @param desc the descriptor (or descriptor prefix) of the method. Nullable.
+	 *
+	 * @param name         the name of the method. Nullable.
+	 * @param desc         the descriptor (or descriptor prefix) of the method. Nullable.
 	 * @param isDescPrefix is {@code descPrefix} a full qualified descriptor or a prefix.
-	 * @param filter any additional constraint. Nullable.
-	 * @param out if not {@code null}, then reuse this collection instead of the internal one. The behaviour
-	 *            is undefined is the collection is non-empty. Nullable.
+	 * @param filter       any additional constraint. Nullable.
+	 * @param out          if not {@code null}, then reuse this collection instead of the internal one. The behaviour
+	 *                     is undefined is the collection is non-empty. Nullable.
 	 * @return the query result.
 	 */
-	Collection<TrMethod> resolveMethods(String name, String desc, boolean isDescPrefix, Predicate<TrMethod> filter, Collection<TrMethod> out);
+	ObjectCollection<TrMethod> resolveMethods(String name, String desc, boolean isDescPrefix, Predicate<TrMethod> filter, ObjectCollection<TrMethod> out);
 
 	boolean isAssignableFrom(TrClass cls);
 	void accept(ClassVisitor cv, int readerFlags);

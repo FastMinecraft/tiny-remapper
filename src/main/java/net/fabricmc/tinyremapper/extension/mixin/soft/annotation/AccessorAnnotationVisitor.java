@@ -18,19 +18,14 @@
 
 package net.fabricmc.tinyremapper.extension.mixin.soft.annotation;
 
-import java.util.List;
+import it.unimi.dsi.fastutil.objects.ObjectList;
+import net.fabricmc.tinyremapper.extension.mixin.common.data.*;
+import net.fabricmc.tinyremapper.extension.mixin.soft.util.NamedMappable;
+import org.objectweb.asm.AnnotationVisitor;
+
 import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.objectweb.asm.AnnotationVisitor;
-
-import net.fabricmc.tinyremapper.extension.mixin.common.data.Annotation;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.AnnotationElement;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.CommonData;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.Constant;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.MxMember;
-import net.fabricmc.tinyremapper.extension.mixin.soft.util.NamedMappable;
 
 /**
  * In case of multi-target, if a remap conflict is detected,
@@ -41,9 +36,9 @@ public class AccessorAnnotationVisitor extends FirstPassAnnotationVisitor {
 	private final AnnotationVisitor delegate;
 	private final MxMember method;
 
-	private final List<String> targets;
+	private final ObjectList<String> targets;
 
-	public AccessorAnnotationVisitor(CommonData data, AnnotationVisitor delegate, MxMember method, boolean remap, List<String> targets) {
+	public AccessorAnnotationVisitor(CommonData data, AnnotationVisitor delegate, MxMember method, boolean remap, ObjectList<String> targets) {
 		super(Annotation.ACCESSOR, remap);
 
 		this.data = Objects.requireNonNull(data);
@@ -66,13 +61,13 @@ public class AccessorAnnotationVisitor extends FirstPassAnnotationVisitor {
 
 	private static class AccessorSecondPassAnnotationVisitor extends AnnotationVisitor {
 		private final CommonData data;
-		private final List<String> targets;
+		private final ObjectList<String> targets;
 		private final String fieldDesc;
 
 		private static final Pattern GETTER_PATTERN = Pattern.compile("(?<=\\(\\)).*");
 		private static final Pattern SETTER_PATTERN = Pattern.compile("(?<=\\().*(?=\\)V)");
 
-		AccessorSecondPassAnnotationVisitor(CommonData data, AnnotationVisitor delegate, MxMember method, List<String> targets) {
+		AccessorSecondPassAnnotationVisitor(CommonData data, AnnotationVisitor delegate, MxMember method, ObjectList<String> targets) {
 			super(Constant.ASM_VERSION, delegate);
 
 			this.data = Objects.requireNonNull(data);

@@ -18,15 +18,13 @@
 
 package net.fabricmc.tinyremapper.extension.mixin.soft.annotation.injection;
 
-import java.util.List;
-
-import org.objectweb.asm.AnnotationVisitor;
-
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.Annotation;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.CommonData;
+import org.objectweb.asm.AnnotationVisitor;
 
 public class ModifyArgsAnnotationVisitor extends CommonInjectionAnnotationVisitor {
-	public ModifyArgsAnnotationVisitor(CommonData data, AnnotationVisitor delegate, boolean remap, List<String> targets) {
+	public ModifyArgsAnnotationVisitor(CommonData data, AnnotationVisitor delegate, boolean remap, ObjectList<String> targets) {
 		super(Annotation.MODIFY_ARGS, data, delegate, remap, targets);
 	}
 }

@@ -18,30 +18,21 @@
 
 package net.fabricmc.tinyremapper;
 
-import java.io.BufferedReader;
-import java.io.EOFException;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.function.BiConsumer;
-import java.util.zip.GZIPInputStream;
-
-import org.objectweb.asm.commons.Remapper;
-
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
+import it.unimi.dsi.fastutil.objects.ReferenceSet;
 import net.fabricmc.tinyremapper.IMappingProvider.MappingAcceptor;
 import net.fabricmc.tinyremapper.IMappingProvider.Member;
+import org.objectweb.asm.commons.Remapper;
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.BiConsumer;
+import java.util.zip.GZIPInputStream;
 
 public final class TinyUtils {
 	private static final class MemberMapping {
@@ -81,9 +72,9 @@ public final class TinyUtils {
 	}
 
 	private static class SimpleClassMapper extends Remapper {
-		final Map<String, String> classMap;
+		final Object2ObjectOpenHashMap<String, String> classMap;
 
-		SimpleClassMapper(Map<String, String> map) {
+		SimpleClassMapper(Object2ObjectOpenHashMap<String, String> map) {
 			this.classMap = map;
 		}
 
@@ -130,11 +121,11 @@ public final class TinyUtils {
 	}
 
 	private static void readInternal(BufferedReader reader, String fromM, String toM, MappingAcceptor out) throws IOException {
-		List<MemberMapping> methodMappings = new ArrayList<>();
-		List<MethodArgMapping> methodArgMappings = new ArrayList<>();
-		List<MethodVarMapping> methodVarMappings = new ArrayList<>();
-		List<MemberMapping> fieldMappings = new ArrayList<>();
-		Set<Member> members = Collections.newSetFromMap(new IdentityHashMap<>()); // for remapping members exactly once in postprocessing
+		ObjectArrayList<MemberMapping> methodMappings = new ObjectArrayList<>();
+		ObjectArrayList<MethodArgMapping> methodArgMappings = new ObjectArrayList<>();
+		ObjectArrayList<MethodVarMapping> methodVarMappings = new ObjectArrayList<>();
+		ObjectArrayList<MemberMapping> fieldMappings = new ObjectArrayList<>();
+		ReferenceSet<Member> members = new ReferenceOpenHashSet<>(); // for remapping members exactly once in postprocessing
 
 		MappingAcceptor tmp = new MappingAcceptor() {
 			@Override
@@ -222,7 +213,7 @@ public final class TinyUtils {
 		if (fromIndex < 0) throw new IOException("Could not find mapping '" + from + "'!");
 		if (toIndex < 0) throw new IOException("Could not find mapping '" + to + "'!");
 
-		Map<String, String> obfFrom = fromIndex != 0 ? new HashMap<>() : null;
+		Object2ObjectOpenHashMap<String, String> obfFrom = fromIndex != 0 ? new Object2ObjectOpenHashMap<>() : null;
 		String line;
 
 		while ((line = reader.readLine()) != null) {
@@ -281,7 +272,7 @@ public final class TinyUtils {
 		List<String> namespaces = Arrays.asList(parts).subList(3, parts.length);
 		int nsA = namespaces.indexOf(from);
 		int nsB = namespaces.indexOf(to);
-		Map<String, String> obfFrom = nsA != 0 ? new HashMap<>() : null;
+		Object2ObjectOpenHashMap<String, String> obfFrom = nsA != 0 ? new Object2ObjectOpenHashMap<>() : null;
 		int partCountHint = 2 + namespaces.size(); // suitable for members, which should be the majority
 		int lineNumber = 1;
 

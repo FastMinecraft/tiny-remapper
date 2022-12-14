@@ -18,13 +18,7 @@
 
 package net.fabricmc.tinyremapper.extension.mixin.hard;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.function.Consumer;
-
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.MethodVisitor;
-
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.Annotation;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.CommonData;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.Constant;
@@ -33,15 +27,20 @@ import net.fabricmc.tinyremapper.extension.mixin.hard.annotation.AccessorAnnotat
 import net.fabricmc.tinyremapper.extension.mixin.hard.annotation.InvokerAnnotationVisitor;
 import net.fabricmc.tinyremapper.extension.mixin.hard.annotation.OverwriteAnnotationVisitor;
 import net.fabricmc.tinyremapper.extension.mixin.hard.annotation.ShadowAnnotationVisitor;
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.MethodVisitor;
+
+import java.util.Objects;
+import java.util.function.Consumer;
 
 class HardTargetMixinMethodVisitor extends MethodVisitor {
-	private final List<Consumer<CommonData>> data;
+	private final ObjectList<Consumer<CommonData>> data;
 	private final MxMember method;
 
 	private final boolean remap;
-	private final List<String> targets;
+	private final ObjectList<String> targets;
 
-	HardTargetMixinMethodVisitor(List<Consumer<CommonData>> data, MethodVisitor delegate, MxMember method, boolean remap, List<String> targets) {
+	HardTargetMixinMethodVisitor(ObjectList<Consumer<CommonData>> data, MethodVisitor delegate, MxMember method, boolean remap, ObjectList<String> targets) {
 		super(Constant.ASM_VERSION, delegate);
 		this.data = Objects.requireNonNull(data);
 		this.method = Objects.requireNonNull(method);

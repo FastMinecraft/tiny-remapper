@@ -18,36 +18,21 @@
 
 package net.fabricmc.tinyremapper;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
-import java.util.function.Predicate;
-
+import it.unimi.dsi.fastutil.objects.*;
+import net.fabricmc.tinyremapper.TinyRemapper.Direction;
+import net.fabricmc.tinyremapper.TinyRemapper.LinkedMethodPropagation;
+import net.fabricmc.tinyremapper.TinyRemapper.MrjState;
+import net.fabricmc.tinyremapper.api.*;
+import net.fabricmc.tinyremapper.api.TrMember.MemberType;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Opcodes;
 
-import net.fabricmc.tinyremapper.TinyRemapper.Direction;
-import net.fabricmc.tinyremapper.TinyRemapper.LinkedMethodPropagation;
-import net.fabricmc.tinyremapper.TinyRemapper.MrjState;
-import net.fabricmc.tinyremapper.api.TrClass;
-import net.fabricmc.tinyremapper.api.TrEnvironment;
-import net.fabricmc.tinyremapper.api.TrField;
-import net.fabricmc.tinyremapper.api.TrMember;
-import net.fabricmc.tinyremapper.api.TrMember.MemberType;
-import net.fabricmc.tinyremapper.api.TrMethod;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
+import java.util.function.Predicate;
 
 public final class ClassInstance implements TrClass {
 	ClassInstance(TinyRemapper tr, boolean isInput, InputTag[] inputTags, String srcFile, byte[] data) {
@@ -194,8 +179,8 @@ public final class ClassInstance implements TrClass {
 	}
 
 	@Override
-	public List<ClassInstance> getInterfaces() {
-		List<ClassInstance> ret = new ArrayList<>(parents.size());
+	public ObjectArrayList<ClassInstance> getInterfaces() {
+		ObjectArrayList<ClassInstance> ret = new ObjectArrayList<>(parents.size());
 
 		for (ClassInstance cls : parents) {
 			if (cls.isInterface()) ret.add(cls);
@@ -205,8 +190,8 @@ public final class ClassInstance implements TrClass {
 	}
 
 	@Override
-	public List<String> getInterfaceNames() {
-		return Collections.unmodifiableList(Arrays.asList(interfaces));
+	public ObjectList<String> getInterfaceNames() {
+		return ObjectLists.unmodifiable(ObjectArrayList.wrap(interfaces));
 	}
 
 	String[] getInterfaceNames0() {
@@ -214,12 +199,12 @@ public final class ClassInstance implements TrClass {
 	}
 
 	@Override
-	public Collection<ClassInstance> getParents() {
+	public ObjectCollection<? extends TrClass> getParents() {
 		return parents;
 	}
 
 	@Override
-	public Collection<ClassInstance> getChildren() {
+	public ObjectCollection<? extends TrClass> getChildren() {
 		return children;
 	}
 
@@ -245,7 +230,7 @@ public final class ClassInstance implements TrClass {
 	 */
 	void propagate(MemberType type, String originatingCls, String idSrc, String nameDst,
 			Direction dir, boolean isVirtual, boolean fromBridge,
-			boolean first, Set<ClassInstance> visitedUp, Set<ClassInstance> visitedDown) {
+			boolean first, ReferenceSet<ClassInstance> visitedUp, ReferenceSet<ClassInstance> visitedDown) {
 		/*
 		 * initial private member or static method in interface: only local
 		 * non-virtual: up to matching member (if not already in this), then down until matching again (exclusive)
@@ -286,8 +271,8 @@ public final class ClassInstance implements TrClass {
 				MemberInstance bridgeTarget = BridgeHandler.getTarget(member);
 
 				if (bridgeTarget != null) {
-					Set<ClassInstance> visitedUpBridge = Collections.newSetFromMap(new IdentityHashMap<>());
-					Set<ClassInstance> visitedDownBridge = Collections.newSetFromMap(new IdentityHashMap<>());
+					ReferenceSet<ClassInstance> visitedUpBridge = new ReferenceOpenHashSet<>();
+					ReferenceSet<ClassInstance> visitedDownBridge = new ReferenceOpenHashSet<>();
 
 					visitedUpBridge.add(member.cls);
 					visitedDownBridge.add(member.cls);
@@ -350,7 +335,7 @@ public final class ClassInstance implements TrClass {
 		if (cls == this) return true;
 
 		if (isInterface()) {
-			Set<ClassInstance> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+			ReferenceSet<ClassInstance> visited = new ReferenceOpenHashSet<>();
 			Deque<ClassInstance> queue = new ArrayDeque<>();
 			visited.add(cls);
 
@@ -442,7 +427,7 @@ public final class ClassInstance implements TrClass {
 
 		if (subCls != null) { // sub class known, search upwards
 			if (superCls == null || superCls.isInterface()) {
-				Set<ClassInstance> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+				ReferenceSet<ClassInstance> visited = new ReferenceOpenHashSet<>();
 				Deque<ClassInstance> queue = new ArrayDeque<>();
 				visited.add(subCls);
 
@@ -466,7 +451,7 @@ public final class ClassInstance implements TrClass {
 				} while (subCls != null);
 			}
 		} else if (superCls != null) { // only super class known, search down
-			Set<ClassInstance> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+			ReferenceSet<ClassInstance> visited = new ReferenceOpenHashSet<>();
 			Deque<ClassInstance> queue = new ArrayDeque<>();
 			visited.add(superCls);
 
@@ -501,8 +486,8 @@ public final class ClassInstance implements TrClass {
 	}
 
 	@Override
-	public Collection<? extends TrField> getFields() {
-		List<TrField> ret = new ArrayList<>(members.size());
+	public ObjectCollection<? extends TrField> getFields() {
+		ObjectArrayList<TrField> ret = new ObjectArrayList<>(members.size());
 
 		for (MemberInstance m : members.values()) {
 			if (m.isField()) ret.add(m);
@@ -512,8 +497,8 @@ public final class ClassInstance implements TrClass {
 	}
 
 	@Override
-	public Collection<? extends TrMethod> getMethods() {
-		List<TrMethod> ret = new ArrayList<>(members.size());
+	public ObjectCollection<? extends TrMethod> getMethods() {
+		ObjectArrayList<TrMethod> ret = new ObjectArrayList<>(members.size());
 
 		for (MemberInstance m : members.values()) {
 			if (m.isMethod()) ret.add(m);
@@ -523,13 +508,13 @@ public final class ClassInstance implements TrClass {
 	}
 
 	@Override
-	public Collection<MemberInstance> getMembers() {
+	public ObjectCollection<MemberInstance> getMembers() {
 		return members.values();
 	}
 
 	@Override
-	public Collection<TrField> getFields(String name, String desc, boolean isDescPrefix, Predicate<TrField> filter, Collection<TrField> out) {
-		if (out == null) out = new ArrayList<>(members.size());
+	public ObjectCollection<TrField> getFields(String name, String desc, boolean isDescPrefix, Predicate<TrField> filter, ObjectCollection<TrField> out) {
+		if (out == null) out = new ObjectArrayList<>(members.size());
 
 		for (MemberInstance m : members.values()) {
 			if (m.isField() && matches(m, name, desc, isDescPrefix, filter)) out.add(m);
@@ -539,8 +524,8 @@ public final class ClassInstance implements TrClass {
 	}
 
 	@Override
-	public Collection<TrMethod> getMethods(String name, String desc, boolean isDescPrefix, Predicate<TrMethod> filter, Collection<TrMethod> out) {
-		if (out == null) out = new ArrayList<>(members.size());
+	public ObjectCollection<TrMethod> getMethods(String name, String desc, boolean isDescPrefix, Predicate<TrMethod> filter, ObjectCollection<TrMethod> out) {
+		if (out == null) out = new ObjectArrayList<>(members.size());
 
 		for (MemberInstance m : members.values()) {
 			if (m.isMethod() && matches(m, name, desc, isDescPrefix, filter)) out.add(m);
@@ -581,7 +566,7 @@ public final class ClassInstance implements TrClass {
 
 	private MemberInstance resolveField(String id) {
 		Deque<ClassInstance> queue = new ArrayDeque<>();
-		Set<ClassInstance> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+		ReferenceSet<ClassInstance> visited = new ReferenceOpenHashSet<>();
 		visited.add(this);
 		ClassInstance context = this;
 
@@ -617,27 +602,27 @@ public final class ClassInstance implements TrClass {
 	}
 
 	@Override
-	public Collection<TrField> resolveFields(String name, String desc, boolean isDescPrefix, Predicate<TrField> filter, Collection<TrField> out) {
+	public ObjectCollection<TrField> resolveFields(String name, String desc, boolean isDescPrefix, Predicate<TrField> filter, ObjectCollection<TrField> out) {
 		if (name != null && (desc != null && !isDescPrefix || tr.ignoreFieldDesc)) {
 			MemberInstance ret = resolve(MemberType.FIELD, MemberInstance.getFieldId(name, desc, tr.ignoreFieldDesc));
 			if (ret != null && filter != null && !filter.test(ret)) ret = null;
 
 			if (out == null) {
-				return ret == null || filter != null ? Collections.emptyList() : Collections.singletonList(ret);
+				return ret == null || filter != null ? ObjectLists.emptyList() : ObjectLists.singleton(ret);
 			} else {
 				if (ret != null) out.add(ret);
 				return out;
 			}
 		}
 
-		if (out == null) out = new ArrayList<>();
+		if (out == null) out = new ObjectArrayList<>();
 
 		for (MemberInstance member : getMembers()) {
 			if (member.isField()) ClassInstance.<TrField>addMatching(member, name, desc, isDescPrefix, filter, out);
 		}
 
 		Deque<ClassInstance> queue = new ArrayDeque<>();
-		Set<ClassInstance> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+		ReferenceSet<ClassInstance> visited = new ReferenceOpenHashSet<>();
 		visited.add(this);
 		ClassInstance context = this;
 
@@ -695,10 +680,10 @@ public final class ClassInstance implements TrClass {
 		// spec, so step 2 ignoring the "exactly one" match requirement doesn't matter and >potentially<
 		// maximally-specific superinterface is good enough
 
-		Deque<ClassInstance> queue = new ArrayDeque<>();
-		Set<ClassInstance> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+		ObjectArrayFIFOQueue<ClassInstance> queue = new ObjectArrayFIFOQueue<>();
+		ReferenceSet<ClassInstance> visited = new ReferenceOpenHashSet<>();
 		visited.add(this);
-		List<MemberInstance> matchedMethods = new ArrayList<>();
+		ObjectArrayList<MemberInstance> matchedMethods = new ObjectArrayList<>();
 		boolean hasNonAbstract = false;
 		cls = this;
 
@@ -716,9 +701,9 @@ public final class ClassInstance implements TrClass {
 					}
 				}
 
-				queue.addLast(parent);
+				queue.enqueue(parent);
 			}
-		} while ((cls = queue.pollFirst()) != null);
+		} while ((cls = queue.dequeue()) != null);
 
 		if (hasNonAbstract && matchedMethods.size() > 1) {
 			// try to select first maximally-specific superinterface method (doesn't matter if it's the only one, jvm spec allows arbitrary choice otherwise)
@@ -739,20 +724,20 @@ public final class ClassInstance implements TrClass {
 	}
 
 	@Override
-	public Collection<TrMethod> resolveMethods(String name, String desc, boolean isDescPrefix, Predicate<TrMethod> filter, Collection<TrMethod> out) {
+	public ObjectCollection<TrMethod> resolveMethods(String name, String desc, boolean isDescPrefix, Predicate<TrMethod> filter, ObjectCollection<TrMethod> out) {
 		if (name != null && desc != null && !isDescPrefix) {
 			MemberInstance ret = resolve(MemberType.METHOD, MemberInstance.getMethodId(name, desc));
 			if (ret != null && filter != null && !filter.test(ret)) ret = null;
 
 			if (out == null) {
-				return ret == null || filter != null ? Collections.emptyList() : Collections.singletonList(ret);
+				return ret == null || filter != null ? ObjectLists.emptyList() : ObjectLists.singleton(ret);
 			} else {
 				if (ret != null) out.add(ret);
 				return out;
 			}
 		}
 
-		if (out == null) out = new ArrayList<>();
+		if (out == null) out = new ObjectArrayList<>();
 
 		for (MemberInstance member : getMembers()) {
 			if (member.isMethod()) addMatching(member, name, desc, isDescPrefix, filter, out);
@@ -779,10 +764,10 @@ public final class ClassInstance implements TrClass {
 		// spec, so step 2 ignoring the "exactly one" match requirement doesn't matter and >potentially<
 		// maximally-specific superinterface is good enough
 
-		Deque<ClassInstance> queue = new ArrayDeque<>();
-		Set<ClassInstance> visited = Collections.newSetFromMap(new IdentityHashMap<>());
+		ObjectArrayFIFOQueue<ClassInstance> queue = new ObjectArrayFIFOQueue<>();
+		ReferenceSet<ClassInstance> visited = new ReferenceOpenHashSet<>();
 		visited.add(this);
-		Map<String, List<TrMethod>> matchedMethodsMap = new HashMap<>();
+		Object2ObjectMap<String, ObjectList<TrMethod>> matchedMethodsMap = new Object2ObjectOpenHashMap<>();
 		boolean hasNonAbstract = false;
 		cls = this;
 
@@ -793,18 +778,18 @@ public final class ClassInstance implements TrClass {
 				if (parent.isInterface()) {
 					for (MemberInstance member : parent.getMembers()) {
 						if (member.isMethod() && matches(member, name, desc, isDescPrefix, filter)) {
-							if (addUnique(member, matchedMethodsMap.computeIfAbsent(member.getId(), ignore -> new ArrayList<>()))) {
+							if (addUnique(member, matchedMethodsMap.computeIfAbsent(member.getId(), ignore -> new ObjectArrayList<>()))) {
 								if (!member.isAbstract()) hasNonAbstract = true;
 							}
 						}
 					}
 				}
 
-				queue.addLast(parent);
+				queue.enqueue(parent);
 			}
-		} while ((cls = queue.pollFirst()) != null);
+		} while ((cls = queue.dequeue()) != null);
 
-		mapLoop: for (List<TrMethod> matchedMethods : matchedMethodsMap.values()) {
+		mapLoop: for (ObjectList<TrMethod> matchedMethods : matchedMethodsMap.values()) {
 			if (matchedMethods.isEmpty()) continue;
 
 			if (hasNonAbstract && matchedMethods.size() > 1) {
@@ -899,10 +884,10 @@ public final class ClassInstance implements TrClass {
 	final String srcPath;
 	byte[] data;
 	private ClassInstance mrjOrigin;
-	private final Map<String, MemberInstance> members = new HashMap<>(); // methods and fields are distinct due to their different desc separators
+	private final Object2ObjectMap<String, MemberInstance> members = new Object2ObjectOpenHashMap<>(); // methods and fields are distinct due to their different desc separators
 	ConcurrentMap<String, MemberInstance> resolvedMembers = new ConcurrentHashMap<>();
-	final Set<ClassInstance> parents = new HashSet<>();
-	final Set<ClassInstance> children = new HashSet<>();
+	final ObjectOpenHashSet<ClassInstance> parents = new ObjectOpenHashSet<>();
+	final ObjectOpenHashSet<ClassInstance> children = new ObjectOpenHashSet<>();
 	private String name;
 	private int classVersion;
 	private int mrjVersion;

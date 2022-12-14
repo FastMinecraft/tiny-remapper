@@ -18,33 +18,27 @@
 
 package net.fabricmc.tinyremapper.extension.mixin.soft;
 
-import java.util.List;
-import java.util.Objects;
-
-import org.objectweb.asm.AnnotationVisitor;
-import org.objectweb.asm.MethodVisitor;
-
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.Annotation;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.CommonData;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.Constant;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.MxMember;
 import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.AccessorAnnotationVisitor;
 import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.InvokerAnnotationVisitor;
-import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.injection.InjectAnnotationVisitor;
-import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.injection.ModifyArgAnnotationVisitor;
-import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.injection.ModifyArgsAnnotationVisitor;
-import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.injection.ModifyConstantAnnotationVisitor;
-import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.injection.ModifyVariableAnnotationVisitor;
-import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.injection.RedirectAnnotationVisitor;
+import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.injection.*;
+import org.objectweb.asm.AnnotationVisitor;
+import org.objectweb.asm.MethodVisitor;
+
+import java.util.Objects;
 
 class SoftTargetMixinMethodVisitor extends MethodVisitor {
 	private final CommonData data;
 	private final MxMember method;
 
 	private final boolean remap;
-	private final List<String> targets;
+	private final ObjectList<String> targets;
 
-	SoftTargetMixinMethodVisitor(CommonData data, MethodVisitor delegate, MxMember method, boolean remap, List<String> targets) {
+	SoftTargetMixinMethodVisitor(CommonData data, MethodVisitor delegate, MxMember method, boolean remap, ObjectList<String> targets) {
 		super(Constant.ASM_VERSION, delegate);
 		this.data = Objects.requireNonNull(data);
 		this.method = Objects.requireNonNull(method);

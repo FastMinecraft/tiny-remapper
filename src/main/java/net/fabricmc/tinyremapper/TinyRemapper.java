@@ -18,6 +18,19 @@
 
 package net.fabricmc.tinyremapper;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.objects.*;
+import net.fabricmc.tinyremapper.IMappingProvider.MappingAcceptor;
+import net.fabricmc.tinyremapper.IMappingProvider.Member;
+import net.fabricmc.tinyremapper.api.TrClass;
+import net.fabricmc.tinyremapper.api.TrEnvironment;
+import net.fabricmc.tinyremapper.api.TrMember;
+import net.fabricmc.tinyremapper.api.TrMember.MemberType;
+import org.objectweb.asm.*;
+import org.objectweb.asm.commons.Remapper;
+import org.objectweb.asm.util.CheckClassAdapter;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.FileVisitResult;
@@ -25,48 +38,15 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Queue;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.FieldVisitor;
-import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.commons.Remapper;
-import org.objectweb.asm.util.CheckClassAdapter;
-
-import net.fabricmc.tinyremapper.IMappingProvider.MappingAcceptor;
-import net.fabricmc.tinyremapper.IMappingProvider.Member;
-import net.fabricmc.tinyremapper.api.TrClass;
-import net.fabricmc.tinyremapper.api.TrEnvironment;
-import net.fabricmc.tinyremapper.api.TrMember;
-import net.fabricmc.tinyremapper.api.TrMember.MemberType;
-
+@SuppressWarnings("ForLoopReplaceableByForEach")
 public class TinyRemapper {
 	public static class Builder {
 		private Builder() {
@@ -249,10 +229,10 @@ public class TinyRemapper {
 			return remapper;
 		}
 
-		private final Set<IMappingProvider> mappingProviders = new HashSet<>();
+		private final ObjectSet<IMappingProvider> mappingProviders = new ObjectOpenHashSet<>();
 		private boolean ignoreFieldDesc;
 		private int threadCount;
-		private final Set<String> forcePropagation = new HashSet<>();
+		private final ObjectSet<String> forcePropagation = new ObjectOpenHashSet<>();
 		private boolean keepInputData = false;
 		private boolean propagatePrivate = false;
 		private LinkedMethodPropagation propagateBridges = LinkedMethodPropagation.DISABLED;
@@ -271,10 +251,10 @@ public class TinyRemapper {
 		private boolean cacheMappings = false;
 		private boolean skipPropagate = false;
 		private boolean logUnknownInvokeDynamic = true;
-		private final List<AnalyzeVisitorProvider> analyzeVisitors = new ArrayList<>();
-		private final List<StateProcessor> stateProcessors = new ArrayList<>();
-		private final List<ApplyVisitorProvider> preApplyVisitors = new ArrayList<>();
-		private final List<ApplyVisitorProvider> postApplyVisitors = new ArrayList<>();
+		private final ObjectList<AnalyzeVisitorProvider> analyzeVisitors = new ObjectArrayList<>();
+		private final ObjectList<StateProcessor> stateProcessors = new ObjectArrayList<>();
+		private final ObjectList<ApplyVisitorProvider> preApplyVisitors = new ObjectArrayList<>();
+		private final ObjectList<ApplyVisitorProvider> postApplyVisitors = new ObjectArrayList<>();
 		private Remapper extraRemapper;
 		private Consumer<String> logger = System.out::println;
 	}
@@ -295,10 +275,10 @@ public class TinyRemapper {
 		ClassVisitor insertApplyVisitor(TrClass cls, ClassVisitor next);
 	}
 
-	private TinyRemapper(Set<IMappingProvider> mappingProviders, boolean ignoreFieldDesc,
+	private TinyRemapper(ObjectSet<IMappingProvider> mappingProviders, boolean ignoreFieldDesc,
 			int threadCount,
 			boolean keepInputData,
-			Set<String> forcePropagation, boolean propagatePrivate,
+			ObjectSet<String> forcePropagation, boolean propagatePrivate,
 			LinkedMethodPropagation propagateBridges, LinkedMethodPropagation propagateRecordComponents,
 			boolean removeFrames,
 			boolean ignoreConflicts,
@@ -312,15 +292,13 @@ public class TinyRemapper {
 			boolean cacheMappings,
 			boolean skipPropagate,
 			boolean logUnknownInvokeDynamic,
-			List<AnalyzeVisitorProvider> analyzeVisitors, List<StateProcessor> stateProcessors,
-			List<ApplyVisitorProvider> preApplyVisitors, List<ApplyVisitorProvider> postApplyVisitors,
+			ObjectList<AnalyzeVisitorProvider> analyzeVisitors, ObjectList<StateProcessor> stateProcessors,
+			ObjectList<ApplyVisitorProvider> preApplyVisitors, ObjectList<ApplyVisitorProvider> postApplyVisitors,
 			Remapper extraRemapper,
 			Consumer<String> logger) {
 		this.mappingProviders = mappingProviders;
 		this.ignoreFieldDesc = ignoreFieldDesc;
-		this.threadCount = threadCount > 0 ? threadCount : Math.max(Runtime.getRuntime().availableProcessors(), 2);
 		this.keepInputData = keepInputData;
-		this.threadPool = Executors.newFixedThreadPool(this.threadCount);
 		this.forcePropagation = forcePropagation;
 		this.propagatePrivate = propagatePrivate;
 		this.propagateBridges = propagateBridges;
@@ -351,14 +329,17 @@ public class TinyRemapper {
 		return new Builder();
 	}
 
-	public void finish() {
-		threadPool.shutdown();
+	@SuppressWarnings("ForLoopReplaceableByForEach")
+    public void finish() {
+        long targetTime = System.currentTimeMillis() + 20_000;
 
-		try {
-			threadPool.awaitTermination(20, TimeUnit.SECONDS);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
+        try {
+            for (int i = 0; i < pendingTasks.size(); i++) {
+                pendingTasks.get(i).get(targetTime - System.currentTimeMillis(), TimeUnit.MILLISECONDS);
+            }
+        } catch (InterruptedException | TimeoutException | ExecutionException e) {
+            e.printStackTrace();
+        }
 
 		outputBuffer = null;
 		defaultState.classes.clear();
@@ -369,11 +350,11 @@ public class TinyRemapper {
 		InputTag ret = new InputTag();
 		InputTag[] array = {ret};
 
-		Map<InputTag, InputTag[]> oldTags, newTags;
+		Reference2ObjectMap<InputTag, InputTag[]> oldTags, newTags;
 
 		do { // cas loop
 			oldTags = this.singleInputTags.get();
-			newTags = new IdentityHashMap<>(oldTags.size() + 1);
+			newTags = new Reference2ObjectOpenHashMap<>(oldTags.size() + 1);
 			newTags.putAll(oldTags);
 			newTags.put(ret, array);
 		} while (!singleInputTags.compareAndSet(oldTags, newTags));
@@ -439,7 +420,7 @@ public class TinyRemapper {
 
 	private CompletableFuture<List<ClassInstance>> readClassAsync(boolean isInput, byte[]... inputs) {
 		InputTag[] tags = singleInputTags.get().get(null);
-		List<CompletableFuture<ClassInstance>> futures = new ArrayList<>();
+		ObjectArrayList<CompletableFuture<ClassInstance>> futures = new ObjectArrayList<>();
 
 		for (byte[] entry : inputs) {
 			futures.add(CompletableFuture.supplyAsync(() -> {
@@ -452,24 +433,26 @@ public class TinyRemapper {
 		}
 
 		dirty = true;
-		return CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
-				.thenApply(ignore -> futures.stream()
-						.map(CompletableFuture::join)
-						.filter(Objects::nonNull)
-						.collect(Collectors.toList()))
-				.whenComplete((res, throwable) -> {
-					if (res != null) {
-						for (ClassInstance node : res) {
-							addClass(node, readClasses, true);
-						}
+		CompletableFuture<List<ClassInstance>> result = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]))
+			.thenApply(ignore -> futures.stream()
+				.map(CompletableFuture::join)
+				.filter(Objects::nonNull)
+				.collect(Collectors.toList()))
+			.whenComplete((res, throwable) -> {
+				if (res != null) {
+					for (ClassInstance node : res) {
+						addClass(node, readClasses, true);
 					}
-				});
+				}
+			});
+		this.pendingTasks.add(result);
+		return result;
 	}
 
 	private CompletableFuture<List<ClassInstance>> read(Path[] inputs, boolean isInput, InputTag tag) {
 		InputTag[] tags = singleInputTags.get().get(tag);
-		List<CompletableFuture<List<ClassInstance>>> futures = new ArrayList<>();
-		List<FileSystemReference> fsToClose = Collections.synchronizedList(new ArrayList<>());
+		ObjectArrayList<CompletableFuture<List<ClassInstance>>> futures = new ObjectArrayList<>();
+		ObjectList<FileSystemReference> fsToClose = ObjectLists.synchronize(new ObjectArrayList<>());
 
 		for (Path input : inputs) {
 			futures.add(read(input, isInput, tags, fsToClose, true));
@@ -562,7 +545,7 @@ public class TinyRemapper {
 
 	private CompletableFuture<List<ClassInstance>> read(Path file, boolean isInput, InputTag[] tags, final String srcPath, List<FileSystemReference> fsToClose, boolean isParentLevel) {
 		if (file.toString().endsWith(".class")) {
-			return CompletableFuture.supplyAsync(() -> {
+			CompletableFuture<List<ClassInstance>> result = CompletableFuture.supplyAsync(() -> {
 				try {
 					ClassInstance res = analyze(isInput, tags, srcPath, new FileMrjPath(file));
 					if (res != null) return Collections.singletonList(res);
@@ -576,8 +559,10 @@ public class TinyRemapper {
 
 				return Collections.emptyList();
 			}, threadPool);
+			this.pendingTasks.add(result);
+			return result;
 		} else if (isParentLevel) {
-			List<CompletableFuture<List<ClassInstance>>> ret = new ArrayList<>();
+			ObjectArrayList<CompletableFuture<List<ClassInstance>>> ret = new ObjectArrayList<>();
 
 			try {
 				if (Files.isDirectory(file)) {
@@ -606,11 +591,14 @@ public class TinyRemapper {
 					});
 				}
 
-				return CompletableFuture.allOf(ret.toArray(new CompletableFuture[0])).thenApply(unused ->
+				CompletableFuture<List<ClassInstance>> result = CompletableFuture.allOf(ret.toArray(new CompletableFuture[0])).thenApply(
+					unused ->
 						ret.stream()
-								.map(CompletableFuture::join)
-								.flatMap(Collection::stream)
-								.collect(Collectors.toList()));
+							.map(CompletableFuture::join)
+							.flatMap(Collection::stream)
+							.collect(Collectors.toList()));
+				this.pendingTasks.add(result);
+				return result;
 			} catch (IOException e) {
 				logger.accept(file.toAbsolutePath().toString());
 				e.printStackTrace();
@@ -863,10 +851,10 @@ public class TinyRemapper {
 
 	private void checkClassMappings() {
 		// determine classes that map to the same target name, if there are any print duplicates and throw
-		Set<String> testSet = new HashSet<>(classMap.values());
+		ObjectOpenHashSet<String> testSet = new ObjectOpenHashSet<>(classMap.values());
 
 		if (testSet.size() != classMap.size()) { // src->target is not a 1:1 mapping
-			Set<String> duplicates = new HashSet<>();
+			ObjectOpenHashSet<String> duplicates = new ObjectOpenHashSet<>();
 
 			for (String name : classMap.values()) {
 				if (!testSet.remove(name)) {
@@ -881,7 +869,10 @@ public class TinyRemapper {
 				builder.append("  [");
 				boolean first = true;
 
-				for (Map.Entry<String, String> e : classMap.entrySet()) {
+				ObjectIterator<Object2ObjectMap.Entry<String, String>> iterator = classMap.object2ObjectEntrySet().fastIterator();
+				while (iterator.hasNext()) {
+					Object2ObjectMap.Entry<String, String> e = iterator.next();
+
 					if (e.getValue().equals(target)) {
 						if (first) {
 							first = false;
@@ -979,15 +970,15 @@ public class TinyRemapper {
 				member.newNameOriginatingCls = null;
 			}
 		});
-		List<Future<?>> futures = new ArrayList<>();
-		List<Map.Entry<String, String>> tasks = new ArrayList<>();
+		ObjectArrayList<Future<?>> futures = new ObjectArrayList<>();
+		ObjectArrayList<Object2ObjectMap.Entry<String, String>> tasks = new ObjectArrayList<>();
 		int maxTasks = methodMap.size() / threadCount / 4;
 
-		for (Map.Entry<String, String> entry : methodMap.entrySet()) {
+		for (Object2ObjectMap.Entry<String, String> entry : methodMap.object2ObjectEntrySet()) {
 			tasks.add(entry);
 
 			if (tasks.size() >= maxTasks) {
-				futures.add(threadPool.submit(new Propagation(state, TrMember.MemberType.METHOD, tasks)));
+				futures.add(threadPool.submit(new Propagation(state, MemberType.METHOD, tasks)));
 				tasks.clear();
 			}
 		}
@@ -995,11 +986,11 @@ public class TinyRemapper {
 		futures.add(threadPool.submit(new Propagation(state, TrMember.MemberType.METHOD, tasks)));
 		tasks.clear();
 
-		for (Map.Entry<String, String> entry : fieldMap.entrySet()) {
+		for (Object2ObjectMap.Entry<String, String> entry : fieldMap.object2ObjectEntrySet()) {
 			tasks.add(entry);
 
 			if (tasks.size() >= maxTasks) {
-				futures.add(threadPool.submit(new Propagation(state, TrMember.MemberType.FIELD, tasks)));
+				futures.add(threadPool.submit(new Propagation(state, MemberType.FIELD, tasks)));
 				tasks.clear();
 			}
 		}
@@ -1017,7 +1008,7 @@ public class TinyRemapper {
 
 		boolean targetNameCheckFailed = state.classes.values().stream().anyMatch(cls -> {
 			boolean _targetNameCheckFailed = false;
-			Set<String> testSet = new HashSet<>();
+			ObjectOpenHashSet<String> testSet = new ObjectOpenHashSet<>();
 
 			for (MemberInstance member : cls.getMembers()) {
 				String name = member.getNewMappedName();
@@ -1029,18 +1020,19 @@ public class TinyRemapper {
 			if (testSet.size() != cls.getMembers().size()) {
 				_targetNameCheckFailed = true;
 
-				Map<String, List<MemberInstance>> duplicates = new HashMap<>();
+				Object2ObjectOpenHashMap<String, ObjectArrayList<MemberInstance>> duplicates = new Object2ObjectOpenHashMap<>();
 
 				for (MemberInstance member : cls.getMembers()) {
 					String name = member.getNewMappedName();
 					if (name == null) name = member.name;
 
-					duplicates.computeIfAbsent(MemberInstance.getId(member.type, name, member.desc, ignoreFieldDesc), ignore -> new ArrayList<>()).add(member);
+					duplicates.computeIfAbsent(MemberInstance.getId(member.type, name, member.desc, ignoreFieldDesc), ignore -> new ObjectArrayList<>()).add(member);
 				}
 
-				for (Map.Entry<String, List<MemberInstance>> e : duplicates.entrySet()) {
+				for (ObjectIterator<Object2ObjectMap.Entry<String, ObjectArrayList<MemberInstance>>> iterator = duplicates.object2ObjectEntrySet().fastIterator(); iterator.hasNext(); ) {
+					Object2ObjectMap.Entry<String, ObjectArrayList<MemberInstance>> e = iterator.next();
 					String nameDesc = e.getKey();
-					List<MemberInstance> members = e.getValue();
+					ObjectArrayList<MemberInstance> members = e.getValue();
 					if (members.size() < 2) continue;
 
 					MemberInstance anyMember = members.get(0);
@@ -1060,8 +1052,17 @@ public class TinyRemapper {
 						builder.append(member.name);
 					}
 
-					builder.append(']').append(MemberInstance.getId(anyMember.type, "", anyMember.desc, ignoreFieldDesc));
-					builder.append(" -> ").append(MemberInstance.getNameFromId(anyMember.type, nameDesc, ignoreFieldDesc));
+					builder.append(']').append(MemberInstance.getId(
+						anyMember.type,
+						"",
+						anyMember.desc,
+						ignoreFieldDesc
+					));
+					builder.append(" -> ").append(MemberInstance.getNameFromId(
+						anyMember.type,
+						nameDesc,
+						ignoreFieldDesc
+					));
 					logger.accept(builder.toString());
 				}
 			}
@@ -1087,18 +1088,23 @@ public class TinyRemapper {
 				logger.accept(String.format("  %s %s %s (%s) -> %s", member.cls.getName(), member.type.name(), member.name, member.desc, names));
 
 				if (ignoreConflicts) {
-					Map<String, String> mappings = member.type == TrMember.MemberType.METHOD ? methodMap : fieldMap;
+					Object2ObjectOpenHashMap<String, String> mappings = member.type == TrMember.MemberType.METHOD ? methodMap : fieldMap;
 					String mappingName = mappings.get(member.cls.getName() + "/" + member.getId());
 
 					if (mappingName == null) { // no direct mapping match, try parents
-						Queue<ClassInstance> queue = new ArrayDeque<>(member.cls.parents);
+						ObjectArrayFIFOQueue<ClassInstance> queue = new ObjectArrayFIFOQueue<>(member.cls.parents.size());
+						for (ClassInstance parent : member.cls.parents) {
+							queue.enqueue(parent);
+						}
 						ClassInstance cls;
 
-						while ((cls = queue.poll()) != null) {
+						while ((cls = queue.dequeue()) != null) {
 							mappingName = mappings.get(cls.getName() + "/" + member.getId());
 							if (mappingName != null) break;
 
-							queue.addAll(cls.parents);
+							for (ClassInstance parent : cls.parents) {
+								queue.enqueue(parent);
+							}
 						}
 					}
 
@@ -1143,7 +1149,7 @@ public class TinyRemapper {
 					immediateOutputConsumer = (cls, data) -> outputConsumer.accept(ClassInstance.getMrjName(cls.getContext().remapper.map(cls.getName()), cls.getMrjVersion()), data);
 				}
 
-				List<Future<?>> futures = new ArrayList<>();
+				ObjectArrayList<Future<?>> futures = new ObjectArrayList<>();
 
 				for (MrjState state : mrjStates.values()) {
 					mrjRefresh(state);
@@ -1227,11 +1233,12 @@ public class TinyRemapper {
 			}
 
 			// find the fromVersion that just lower the the toVersion
-			Optional<Integer> fromVersion = mrjStates.keySet().stream()
-					.filter(v -> v < newVersion).max(Integer::compare);
+			OptionalInt fromVersion = mrjStates.keySet().intStream()
+				.filter(v -> v < newVersion)
+				.max();
 
 			if (fromVersion.isPresent()) {
-				Map<String, ClassInstance> fromClasses = mrjStates.get(fromVersion.get()).classes;
+				Object2ObjectOpenHashMap<String, ClassInstance> fromClasses = mrjStates.get(fromVersion.getAsInt()).classes;
 
 				for (ClassInstance cls : fromClasses.values()) {
 					addClass(cls.constructMrjCopy(newState), newState.classes, false);
@@ -1315,7 +1322,7 @@ public class TinyRemapper {
 			return;
 		}
 
-		assert new HashSet<>(state.classes.values()).size() == state.classes.size();
+		assert new ObjectOpenHashSet<>(state.classes.values()).size() == state.classes.size();
 		assert state.classes.values().stream().map(ClassInstance::getName).distinct().count() == state.classes.size();
 
 		mergeInput(state);
@@ -1362,11 +1369,11 @@ public class TinyRemapper {
 
 	private byte[] fixClass(ClassInstance cls, byte[] data) {
 		boolean makeClsPublic = classesToMakePublic.contains(cls);
-		Set<String> clsMembersToMakePublic = null;
+		ObjectOpenHashSet<String> clsMembersToMakePublic = null;
 
 		for (MemberInstance member : cls.getMembers()) {
 			if (membersToMakePublic.contains(member)) {
-				if (clsMembersToMakePublic == null) clsMembersToMakePublic = new HashSet<>();
+				if (clsMembersToMakePublic == null) clsMembersToMakePublic = new ObjectOpenHashSet<>();
 
 				AsmRemapper remapper = cls.getContext().remapper;
 				String mappedName, mappedDesc;
@@ -1438,9 +1445,10 @@ public class TinyRemapper {
 		return (AsmRemapper) getEnvironment().getRemapper();
 	}
 
-	private static void waitForAll(Iterable<Future<?>> futures) {
+	private static void waitForAll(ObjectArrayList<Future<?>> futures) {
 		try {
-			for (Future<?> future : futures) {
+			for (int i = 0, futuresSize = futures.size(); i < futuresSize; i++) {
+				Future<?> future = futures.get(i);
 				future.get();
 			}
 		} catch (InterruptedException | ExecutionException e) {
@@ -1485,7 +1493,7 @@ public class TinyRemapper {
 	}
 
 	class Propagation implements Runnable {
-		Propagation(MrjState state, MemberType type, List<Map.Entry<String, String>> tasks) {
+		Propagation(MrjState state, MemberType type, ObjectArrayList<Object2ObjectMap.Entry<String, String>> tasks) {
 			this.state = state;
 			this.type = type;
 			this.tasks.addAll(tasks);
@@ -1493,10 +1501,11 @@ public class TinyRemapper {
 
 		@Override
 		public void run() {
-			Set<ClassInstance> visitedUp = Collections.newSetFromMap(new IdentityHashMap<>());
-			Set<ClassInstance> visitedDown = Collections.newSetFromMap(new IdentityHashMap<>());
+			ReferenceSet<ClassInstance> visitedUp = new ReferenceOpenHashSet<>();
+			ReferenceSet<ClassInstance> visitedDown = new ReferenceOpenHashSet<>();
 
-			for (Map.Entry<String, String> entry : tasks) {
+			for (int i = 0, tasksSize = tasks.size(); i < tasksSize; i++) {
+				Object2ObjectMap.Entry<String, String> entry = tasks.get(i);
 				String className = getClassName(entry.getKey(), type);
 				ClassInstance cls = state.getClass(className);
 				if (cls == null) continue; // not available for this Side
@@ -1522,7 +1531,7 @@ public class TinyRemapper {
 
 		private final MrjState state;
 		private final MemberType type;
-		private final List<Map.Entry<String, String>> tasks = new ArrayList<>();
+		private final ObjectArrayList<Object2ObjectMap.Entry<String, String>> tasks = new ObjectArrayList<>();
 	}
 
 	public enum LinkedMethodPropagation {
@@ -1571,15 +1580,15 @@ public class TinyRemapper {
 		@Override
 		public void propagate(TrMember m, String newName) {
 			MemberInstance member = (MemberInstance) m;
-			Set<ClassInstance> visitedUp = Collections.newSetFromMap(new IdentityHashMap<>());
-			Set<ClassInstance> visitedDown = Collections.newSetFromMap(new IdentityHashMap<>());
+			ReferenceSet<ClassInstance> visitedUp = new ReferenceOpenHashSet<>();
+			ReferenceSet<ClassInstance> visitedDown = new ReferenceOpenHashSet<>();
 
 			Propagator.propagate(member, member.getId(), newName, visitedUp, visitedDown);
 		}
 
 		final TinyRemapper tr;
 		final int version;
-		final Map<String, ClassInstance> classes = new HashMap<>();
+		final Object2ObjectOpenHashMap<String, ClassInstance> classes = new Object2ObjectOpenHashMap<>();
 		final AsmRemapper remapper;
 		boolean mergedClasspath = false;
 		volatile boolean dirty = true;
@@ -1592,7 +1601,7 @@ public class TinyRemapper {
 	private final boolean check = false;
 
 	private final boolean keepInputData;
-	final Set<String> forcePropagation;
+	final ObjectSet<String> forcePropagation;
 	final boolean propagatePrivate;
 	final LinkedMethodPropagation propagateBridges;
 	final LinkedMethodPropagation propagateRecordComponents;
@@ -1610,38 +1619,51 @@ public class TinyRemapper {
 	private final boolean cacheMappings;
 	private final boolean skipPropagate;
 	final boolean logUnknownInvokeDynamic;
-	private final List<AnalyzeVisitorProvider> analyzeVisitors;
-	private final List<StateProcessor> stateProcessors;
-	private final List<ApplyVisitorProvider> preApplyVisitors;
-	private final List<ApplyVisitorProvider> postApplyVisitors;
+	private final ObjectList<AnalyzeVisitorProvider> analyzeVisitors;
+	private final ObjectList<StateProcessor> stateProcessors;
+	private final ObjectList<ApplyVisitorProvider> preApplyVisitors;
+	private final ObjectList<ApplyVisitorProvider> postApplyVisitors;
 	final Remapper extraRemapper;
 	final Consumer<String> logger;
 
-	final AtomicReference<Map<InputTag, InputTag[]>> singleInputTags = new AtomicReference<>(Collections.emptyMap()); // cache for tag -> { tag }
+	final AtomicReference<Reference2ObjectMap<InputTag, InputTag[]>> singleInputTags =
+		new AtomicReference<>(Reference2ObjectMaps.emptyMap()); // cache for tag -> { tag }
 
-	final List<CompletableFuture<?>> pendingReads = new ArrayList<>(); // reads that need to be waited for before continuing processing (assumes lack of external waiting)
-	final Map<String, ClassInstance> readClasses = new ConcurrentHashMap<>(); // classes being potentially concurrently read, to be transferred into unsynchronized classes later
+	final ObjectArrayList<CompletableFuture<?>> pendingReads = new ObjectArrayList<>(); // reads that need to be waited for before continuing processing (assumes lack of external waiting)
+	final ConcurrentHashMap<String, ClassInstance> readClasses = new ConcurrentHashMap<>(); // classes being potentially concurrently read, to be transferred into unsynchronized classes later
 
 	final MrjState defaultState = new MrjState(this, ClassInstance.MRJ_DEFAULT);
-	final Map<Integer, MrjState> mrjStates = new HashMap<>();
+	final Int2ObjectMap<MrjState> mrjStates = new Int2ObjectOpenHashMap<>();
 
 	{
 		mrjStates.put(defaultState.version, defaultState);
 	}
 
-	final Map<String, String> classMap = new HashMap<>();
-	final Map<String, String> methodMap = new HashMap<>();
-	final Map<String, String> methodArgMap = new HashMap<>();
-	final Map<String, String> fieldMap = new HashMap<>();
-	final Map<MemberInstance, Set<String>> conflicts = new ConcurrentHashMap<>();
+	final Object2ObjectOpenHashMap<String, String> classMap = new Object2ObjectOpenHashMap<>();
+	final Object2ObjectOpenHashMap<String, String> methodMap = new Object2ObjectOpenHashMap<>();
+	final Object2ObjectOpenHashMap<String, String> methodArgMap = new Object2ObjectOpenHashMap<>();
+	final Object2ObjectOpenHashMap<String, String> fieldMap = new Object2ObjectOpenHashMap<>();
+	final ConcurrentHashMap<MemberInstance, Set<String>> conflicts = new ConcurrentHashMap<>();
 	final Set<ClassInstance> classesToMakePublic = Collections.newSetFromMap(new ConcurrentHashMap<>());
 	final Set<MemberInstance> membersToMakePublic = Collections.newSetFromMap(new ConcurrentHashMap<>());
-	private Set<IMappingProvider> mappingProviders;
+	private final ObjectSet<IMappingProvider> mappingProviders;
 	final boolean ignoreFieldDesc;
-	private final int threadCount;
-	private final ExecutorService threadPool;
+	private final ObjectArrayList<Future<?>> pendingTasks = new ObjectArrayList<>();
 
 	private boolean mappingsDirty = true;
 	private volatile boolean dirty = true; // volatile to make the state debug asserts more reliable, shouldn't actually see concurrent modifications
 	private Map<ClassInstance, byte[]> outputBuffer;
+
+	private static final int threadCount = Math.max(Runtime.getRuntime().availableProcessors(), 2);
+	private static final ThreadPoolExecutor threadPool = new ThreadPoolExecutor(
+        threadCount,
+        threadCount,
+        15L,
+        TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>()
+    );
+
+	static {
+		threadPool.allowCoreThreadTimeOut(true);
+	}
 }

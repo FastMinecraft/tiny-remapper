@@ -18,22 +18,16 @@
 
 package net.fabricmc.tinyremapper.extension.mixin.soft;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
-
+import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+import it.unimi.dsi.fastutil.objects.ObjectLists;
+import net.fabricmc.tinyremapper.extension.mixin.common.data.*;
+import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.MixinAnnotationVisitor;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 
-import net.fabricmc.tinyremapper.extension.mixin.common.data.Annotation;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.CommonData;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.Constant;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.MxClass;
-import net.fabricmc.tinyremapper.extension.mixin.common.data.MxMember;
-import net.fabricmc.tinyremapper.extension.mixin.soft.annotation.MixinAnnotationVisitor;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SoftTargetMixinClassVisitor extends ClassVisitor {
 	private final CommonData data;
@@ -41,7 +35,7 @@ public class SoftTargetMixinClassVisitor extends ClassVisitor {
 
 	// @Mixin
 	private final AtomicBoolean remap = new AtomicBoolean();
-	private final List<String> targets = new ArrayList<>();
+	private final ObjectArrayList<String> targets = new ObjectArrayList<>();
 
 	public SoftTargetMixinClassVisitor(CommonData data, ClassVisitor delegate) {
 		super(Constant.ASM_VERSION, delegate);
@@ -79,7 +73,7 @@ public class SoftTargetMixinClassVisitor extends ClassVisitor {
 		if (targets.isEmpty()) {
 			return mv;
 		} else {
-			return new SoftTargetMixinMethodVisitor(data, mv, method, remap.get(), Collections.unmodifiableList(targets));
+			return new SoftTargetMixinMethodVisitor(data, mv, method, remap.get(), ObjectLists.unmodifiable(targets));
 		}
 	}
 }
