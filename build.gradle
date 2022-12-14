@@ -21,12 +21,12 @@ repositories {
 }
 
 dependencies {
-	api 'org.ow2.asm:asm:9.3'
-	api 'org.ow2.asm:asm-commons:9.3'
-	implementation 'org.ow2.asm:asm-tree:9.3'
-	implementation 'org.ow2.asm:asm-util:9.3'
+	api 'org.ow2.asm:asm:9.4'
+	api 'org.ow2.asm:asm-commons:9.4'
+	implementation 'org.ow2.asm:asm-tree:9.4'
+	implementation 'org.ow2.asm:asm-util:9.4'
 
-	testImplementation 'org.junit.jupiter:junit-jupiter:5.6.2'
+	testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
 }
 
 java {
