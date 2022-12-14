@@ -45,7 +45,7 @@ tasks.withType(JavaCompile).configureEach {
 shadowJar {
 	relocate 'net.fabricmc.tinyremapper', 'dev.architectury.tinyremapper'
 	classifier null
-	configurations = []
+	configurations = [project.configurations.runtimeClasspath]
 }
 
 test {
