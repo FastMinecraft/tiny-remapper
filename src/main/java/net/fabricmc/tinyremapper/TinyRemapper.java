@@ -18,8 +18,7 @@
 
 package net.fabricmc.tinyremapper;
 
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.*;
 import it.unimi.dsi.fastutil.objects.*;
 import net.fabricmc.tinyremapper.IMappingProvider.MappingAcceptor;
 import net.fabricmc.tinyremapper.IMappingProvider.Member;
@@ -1223,28 +1222,28 @@ public class TinyRemapper {
 	 *
 	 * @param newVersions the new versions that need to be added in to {@code mrjClasses}
 	 */
-	private void fixMrjClasses(Set<Integer> newVersions) {
+	private void fixMrjClasses(IntSet newVersions) {
 		// ensure the new version is added from lowest to highest
-		for (int newVersion : newVersions.stream().sorted().collect(Collectors.toList())) {
-			MrjState newState = new MrjState(this, newVersion);
+		newVersions.forEach(newVersion -> {
+				MrjState newState = new MrjState(this, newVersion);
 
-			if (mrjStates.put(newVersion, newState) != null) {
-				throw new RuntimeException("internal error: duplicate versions in mrjClasses");
-			}
-
-			// find the fromVersion that just lower the the toVersion
-			OptionalInt fromVersion = mrjStates.keySet().intStream()
-				.filter(v -> v < newVersion)
-				.max();
-
-			if (fromVersion.isPresent()) {
-				Object2ObjectOpenHashMap<String, ClassInstance> fromClasses = mrjStates.get(fromVersion.getAsInt()).classes;
-
-				for (ClassInstance cls : fromClasses.values()) {
-					addClass(cls.constructMrjCopy(newState), newState.classes, false);
+				if (mrjStates.put(newVersion, newState) != null) {
+					throw new RuntimeException("internal error: duplicate versions in mrjClasses");
 				}
-			}
-		}
+
+				// find the fromVersion that just lower the the toVersion
+				OptionalInt fromVersion = mrjStates.keySet().intStream()
+					.filter(v -> v < newVersion)
+					.max();
+
+				if (fromVersion.isPresent()) {
+					Object2ObjectOpenHashMap<String, ClassInstance> fromClasses = mrjStates.get(fromVersion.getAsInt()).classes;
+
+					for (ClassInstance cls : fromClasses.values()) {
+						addClass(cls.constructMrjCopy(newState), newState.classes, false);
+					}
+				}
+			});
 	}
 
 	public void removeInput() {
@@ -1269,9 +1268,13 @@ public class TinyRemapper {
 	private void _prepareClasses() {
 		if (!readClasses.isEmpty()) {
 			// fix any new adding MRJ versions
-			Set<Integer> versions = readClasses.values().stream().map(ClassInstance::getMrjVersion).collect(Collectors.toSet());
-			versions.removeAll(mrjStates.keySet());
-			fixMrjClasses(versions);
+			IntSet verisons = new IntRBTreeSet();
+			for (ClassInstance classInstance : readClasses.values()) {
+				int mrjVersion = classInstance.getMrjVersion();
+				verisons.add(mrjVersion);
+			}
+			verisons.removeAll(mrjStates.keySet());
+			fixMrjClasses(verisons);
 
 			for (ClassInstance cls : readClasses.values()) {
 				// TODO: this might be able to optimize, any suggestion?
@@ -1280,7 +1283,9 @@ public class TinyRemapper {
 				cls.setContext(state);
 				addClass(cls, state.classes, false);
 
-				for (int version : mrjStates.keySet()) {
+				IntIterator iterator = mrjStates.keySet().intIterator();
+				while (iterator.hasNext()) {
+					int version = iterator.nextInt();
 					if (version > clsVersion) {
 						MrjState newState = mrjStates.get(version);
 						addClass(cls.constructMrjCopy(newState), newState.classes, false);
@@ -1343,6 +1348,7 @@ public class TinyRemapper {
 
 		ClassVisitor visitor = writer;
 
+		boolean check = false;
 		if (check) {
 			visitor = new CheckClassAdapter(visitor);
 		}
@@ -1557,10 +1563,15 @@ public class TinyRemapper {
 		MrjState(TinyRemapper tr, int version) {
 			Objects.requireNonNull(tr);
 
-			this.tr = tr;
 			this.version = version;
 			this.remapper = new AsmRemapper(this);
 		}
+
+		private final int version;
+		private final Object2ObjectOpenHashMap<String, ClassInstance> classes = new Object2ObjectOpenHashMap<>(16, 0.95f);
+		private final AsmRemapper remapper;
+		private boolean mergedClasspath = false;
+		private volatile boolean dirty = true;
 
 		@Override
 		public int getMrjVersion() {
@@ -1585,13 +1596,6 @@ public class TinyRemapper {
 
 			Propagator.propagate(member, member.getId(), newName, visitedUp, visitedDown);
 		}
-
-		final TinyRemapper tr;
-		final int version;
-		final Object2ObjectOpenHashMap<String, ClassInstance> classes = new Object2ObjectOpenHashMap<>();
-		final AsmRemapper remapper;
-		boolean mergedClasspath = false;
-		volatile boolean dirty = true;
 	}
 
 	public boolean isMappingsDirty() {
@@ -1633,7 +1637,7 @@ public class TinyRemapper {
 	final ConcurrentHashMap<String, ClassInstance> readClasses = new ConcurrentHashMap<>(); // classes being potentially concurrently read, to be transferred into unsynchronized classes later
 
 	final MrjState defaultState = new MrjState(this, ClassInstance.MRJ_DEFAULT);
-	final Int2ObjectMap<MrjState> mrjStates = new Int2ObjectOpenHashMap<>();
+	final Int2ObjectMap<MrjState> mrjStates = new Int2ObjectOpenHashMap<>(4, 0.9f);
 
 	{
 		mrjStates.put(defaultState.version, defaultState);

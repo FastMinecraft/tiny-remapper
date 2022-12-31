@@ -55,6 +55,33 @@ public final class ClassInstance implements TrClass {
 		this.interfaces = interfaces;
 	}
 
+	public static final int MRJ_DEFAULT = -1;
+	public static final String MRJ_PREFIX = "/META-INF/versions";
+
+	private static final String objectClassName = "java/lang/Object";
+	private static final MemberInstance nullMember = new MemberInstance(null, null, null, null, 0, 0);
+	private static final AtomicReferenceFieldUpdater<ClassInstance, InputTag[]> inputTagsUpdater = AtomicReferenceFieldUpdater.newUpdater(ClassInstance.class, InputTag[].class, "inputTags");
+
+	final TinyRemapper tr;
+	final boolean isInput;
+	final String srcPath;
+	byte[] data;
+	ConcurrentMap<String, MemberInstance> resolvedMembers = new ConcurrentHashMap<>(0, 0.8f);
+	final ObjectOpenHashSet<ClassInstance> parents = new ObjectOpenHashSet<>(0, 0.8f);
+	final ObjectOpenHashSet<ClassInstance> children = new ObjectOpenHashSet<>(0, 0.8f);
+
+	private MrjState context;
+	private volatile InputTag[] inputTags; // cow input tag list, null for none
+	private ClassInstance mrjOrigin;
+	private final Object2ObjectMap<String, MemberInstance> members = new Object2ObjectOpenHashMap<>(0, 0.9f); // methods and fields are distinct due to their different desc separators
+	private String name;
+	private int classVersion;
+	private int mrjVersion;
+	private String superName;
+	private String signature;
+	private int access;
+	private String[] interfaces;
+
 	void setContext(MrjState context) {
 		this.context = context;
 	}
@@ -870,31 +897,4 @@ public final class ClassInstance implements TrClass {
 			return clsName;
 		}
 	}
-
-	public static final int MRJ_DEFAULT = -1;
-	public static final String MRJ_PREFIX = "/META-INF/versions";
-
-	private static final String objectClassName = "java/lang/Object";
-	private static final MemberInstance nullMember = new MemberInstance(null, null, null, null, 0, 0);
-	private static final AtomicReferenceFieldUpdater<ClassInstance, InputTag[]> inputTagsUpdater = AtomicReferenceFieldUpdater.newUpdater(ClassInstance.class, InputTag[].class, "inputTags");
-
-	final TinyRemapper tr;
-	private MrjState context;
-
-	final boolean isInput;
-	private volatile InputTag[] inputTags; // cow input tag list, null for none
-	final String srcPath;
-	byte[] data;
-	private ClassInstance mrjOrigin;
-	private final Object2ObjectMap<String, MemberInstance> members = new Object2ObjectOpenHashMap<>(); // methods and fields are distinct due to their different desc separators
-	ConcurrentMap<String, MemberInstance> resolvedMembers = new ConcurrentHashMap<>();
-	final ObjectOpenHashSet<ClassInstance> parents = new ObjectOpenHashSet<>();
-	final ObjectOpenHashSet<ClassInstance> children = new ObjectOpenHashSet<>();
-	private String name;
-	private int classVersion;
-	private int mrjVersion;
-	private String superName;
-	private String signature;
-	private int access;
-	private String[] interfaces;
 }
