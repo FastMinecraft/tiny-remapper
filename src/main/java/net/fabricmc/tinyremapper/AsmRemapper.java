@@ -18,21 +18,20 @@
 
 package net.fabricmc.tinyremapper;
 
-import java.util.Collection;
-
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.Type;
-
 import net.fabricmc.tinyremapper.TinyRemapper.LinkedMethodPropagation;
 import net.fabricmc.tinyremapper.TinyRemapper.MrjState;
 import net.fabricmc.tinyremapper.api.TrMember;
 import net.fabricmc.tinyremapper.api.TrMethod;
 import net.fabricmc.tinyremapper.api.TrRemapper;
+import org.objectweb.asm.ClassVisitor;
+import org.objectweb.asm.Type;
+
+import java.util.Collection;
 
 class AsmRemapper extends TrRemapper {
 	AsmRemapper(MrjState context) {
 		this.context = context;
-		this.tr = context.tr;
+		this.tr = context.getTr();
 	}
 
 	@Override

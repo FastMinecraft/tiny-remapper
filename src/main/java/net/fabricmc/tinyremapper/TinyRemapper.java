@@ -1563,10 +1563,12 @@ public class TinyRemapper {
 		MrjState(TinyRemapper tr, int version) {
 			Objects.requireNonNull(tr);
 
+			this.tr = tr;
 			this.version = version;
 			this.remapper = new AsmRemapper(this);
 		}
 
+		private final TinyRemapper tr;
 		private final int version;
 		private final Object2ObjectOpenHashMap<String, ClassInstance> classes = new Object2ObjectOpenHashMap<>(16, 0.95f);
 		private final AsmRemapper remapper;
@@ -1581,6 +1583,10 @@ public class TinyRemapper {
 		@Override
 		public AsmRemapper getRemapper() {
 			return remapper;
+		}
+
+		public TinyRemapper getTr() {
+			return tr;
 		}
 
 		@Override

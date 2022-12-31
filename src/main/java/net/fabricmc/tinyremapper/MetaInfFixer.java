@@ -90,7 +90,7 @@ public class MetaInfFixer implements OutputConsumerPath.ResourceRemapper {
 	private static String mapFullyQualifiedClassName(String name, TinyRemapper tr) {
 		assert name.indexOf('/') < 0;
 
-		return tr.defaultState.remapper.map(name.replace('.', '/')).replace('/', '.');
+		return tr.defaultState.getRemapper().map(name.replace('.', '/')).replace('/', '.');
 	}
 
 	private static void fixManifest(Manifest manifest, TinyRemapper remapper) {
