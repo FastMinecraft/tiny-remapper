@@ -1,7 +1,7 @@
 plugins {
 	id 'java-library'
 	id 'maven-publish'
-	id 'checkstyle'
+//	id 'checkstyle'
 	id 'com.diffplug.spotless' version '5.14.2'
 	id 'com.github.johnrengelman.shadow' version '6.1.0'
 }
@@ -9,7 +9,8 @@ plugins {
 sourceCompatibility = JavaVersion.VERSION_1_8
 targetCompatibility = JavaVersion.VERSION_1_8
 
-version = '1.8.' + (System.getenv("GITHUB_RUN_NUMBER") ?: "9999")
+//version = '1.8.' + (System.getenv("GITHUB_RUN_NUMBER") ?: "9999")
+version = '1.8-SNAPSHOT'
 
 def ENV = System.getenv()
 
@@ -66,10 +67,10 @@ jar {
 	classifier 'raw'
 }
 
-checkstyle {
-	configFile = file("checkstyle.xml")
-	toolVersion = '8.31'
-}
+//checkstyle {
+//	configFile = file("checkstyle.xml")
+//	toolVersion = '8.31'
+//}
 
 spotless {
 	ratchetFrom 'origin/master'
