@@ -2,8 +2,8 @@ plugins {
 	id 'java-library'
 	id 'maven-publish'
 //	id 'checkstyle'
-	id 'com.diffplug.spotless' version '5.14.2'
-	id 'com.github.johnrengelman.shadow' version '6.1.0'
+	id 'com.diffplug.spotless' version '6.12.1'
+	id 'com.github.johnrengelman.shadow' version '7.1.2'
 	id 'dev.fastmc.maven-repo' version '1.0.0'
 }
 
