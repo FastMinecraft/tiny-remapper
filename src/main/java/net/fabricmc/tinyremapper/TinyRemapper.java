@@ -45,7 +45,7 @@ import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-@SuppressWarnings("ForLoopReplaceableByForEach")
+@SuppressWarnings({ "ForLoopReplaceableByForEach", "WhileLoopReplaceableByForEach" })
 public class TinyRemapper {
 	public static class Builder {
 		private Builder() {
@@ -1224,7 +1224,8 @@ public class TinyRemapper {
 	 */
 	private void fixMrjClasses(IntSet newVersions) {
 		// ensure the new version is added from lowest to highest
-		for (IntIterator iterator = newVersions.iterator(); iterator.hasNext(); ) {
+		IntIterator iterator = newVersions.iterator();
+		while (iterator.hasNext()) {
 			int newVersion = iterator.next();
 			MrjState newState = new MrjState(this, newVersion);
 
@@ -1284,7 +1285,7 @@ public class TinyRemapper {
 				cls.setContext(state);
 				addClass(cls, state.classes, false);
 
-				IntIterator iterator = mrjStates.keySet().intIterator();
+				IntIterator iterator = mrjStates.keySet().iterator();
 				while (iterator.hasNext()) {
 					int version = iterator.nextInt();
 					if (version > clsVersion) {
