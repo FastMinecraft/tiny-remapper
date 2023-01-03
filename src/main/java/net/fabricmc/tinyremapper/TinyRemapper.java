@@ -1224,26 +1224,27 @@ public class TinyRemapper {
 	 */
 	private void fixMrjClasses(IntSet newVersions) {
 		// ensure the new version is added from lowest to highest
-		newVersions.forEach(newVersion -> {
-				MrjState newState = new MrjState(this, newVersion);
+		for (IntIterator iterator = newVersions.iterator(); iterator.hasNext(); ) {
+			int newVersion = iterator.next();
+			MrjState newState = new MrjState(this, newVersion);
 
-				if (mrjStates.put(newVersion, newState) != null) {
-					throw new RuntimeException("internal error: duplicate versions in mrjClasses");
+			if (mrjStates.put(newVersion, newState) != null) {
+				throw new RuntimeException("internal error: duplicate versions in mrjClasses");
+			}
+
+			// find the fromVersion that just lower the the toVersion
+			OptionalInt fromVersion = Arrays.stream(mrjStates.keySet().toIntArray())
+				.filter(v -> v < newVersion)
+				.max();
+
+			if (fromVersion.isPresent()) {
+				Object2ObjectOpenHashMap<String, ClassInstance> fromClasses = mrjStates.get(fromVersion.getAsInt()).classes;
+
+				for (ClassInstance cls : fromClasses.values()) {
+					addClass(cls.constructMrjCopy(newState), newState.classes, false);
 				}
-
-				// find the fromVersion that just lower the the toVersion
-				OptionalInt fromVersion = mrjStates.keySet().intStream()
-					.filter(v -> v < newVersion)
-					.max();
-
-				if (fromVersion.isPresent()) {
-					Object2ObjectOpenHashMap<String, ClassInstance> fromClasses = mrjStates.get(fromVersion.getAsInt()).classes;
-
-					for (ClassInstance cls : fromClasses.values()) {
-						addClass(cls.constructMrjCopy(newState), newState.classes, false);
-					}
-				}
-			});
+			}
+		}
 	}
 
 	public void removeInput() {

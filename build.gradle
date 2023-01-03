@@ -27,7 +27,7 @@ dependencies {
 	api 'org.ow2.asm:asm-commons:9.4'
 	implementation 'org.ow2.asm:asm-tree:9.4'
 	implementation 'org.ow2.asm:asm-util:9.4'
-	implementation 'it.unimi.dsi:fastutil:8.5.9'
+	implementation 'it.unimi.dsi:fastutil:7.1.0'
 
 	testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
 }
