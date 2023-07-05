@@ -7,11 +7,8 @@ plugins {
 	id 'dev.fastmc.maven-repo' version '1.0.0'
 }
 
-sourceCompatibility = JavaVersion.VERSION_1_8
-targetCompatibility = JavaVersion.VERSION_1_8
-
 //version = '1.8.' + (System.getenv("GITHUB_RUN_NUMBER") ?: "9999")
-version = '1.8-SNAPSHOT'
+version = '1.9-SNAPSHOT'
 
 def ENV = System.getenv()
 
@@ -33,6 +30,9 @@ dependencies {
 }
 
 java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
 	withSourcesJar()
 }
 
@@ -46,7 +46,7 @@ tasks.withType(JavaCompile).configureEach {
 
 shadowJar {
 	relocate 'net.fabricmc.tinyremapper', 'dev.architectury.tinyremapper'
-	classifier null
+	archiveClassifier = null
 	configurations = [project.configurations.runtimeClasspath]
 }
 
@@ -65,7 +65,7 @@ jar {
 					'Implementation-Version': archiveVersion,
 					'Main-Class': "dev.architectury.tinyremapper.Main"
 	}
-	classifier 'raw'
+	archiveClassifier = 'raw'
 }
 
 //checkstyle {
