@@ -19,25 +19,26 @@
 package net.fabricmc.tinyremapper.api;
 
 public interface TrEnvironment {
-	int getMrjVersion();
-	TrRemapper getRemapper();
+    int getMrjVersion();
 
-	/**
-	 * @return the class with the passed name, or null if not found.
-	 */
-	TrClass getClass(String internalName);
+    TrRemapper getRemapper();
 
-	default TrField getField(String owner, String name, String desc) {
-		TrClass cls = getClass(owner);
+    /**
+     * @return the class with the passed name, or null if not found.
+     */
+    TrClass getClass(String internalName);
 
-		return cls != null ? cls.getField(name, desc) : null;
-	}
+    default TrField getField(String owner, String name, String desc) {
+        TrClass cls = getClass(owner);
 
-	default TrMethod getMethod(String owner, String name, String desc) {
-		TrClass cls = getClass(owner);
+        return cls != null ? cls.getField(name, desc) : null;
+    }
 
-		return cls != null ? cls.getMethod(name, desc) : null;
-	}
+    default TrMethod getMethod(String owner, String name, String desc) {
+        TrClass cls = getClass(owner);
 
-	void propagate(TrMember member, String newName);
+        return cls != null ? cls.getMethod(name, desc) : null;
+    }
+
+    void propagate(TrMember member, String newName);
 }

@@ -20,25 +20,28 @@ package net.fabricmc.tinyremapper;
 
 @FunctionalInterface
 public interface IMappingProvider {
-	void load(MappingAcceptor out);
+    void load(MappingAcceptor out);
 
-	public interface MappingAcceptor {
-		void acceptClass(String srcName, String dstName);
-		void acceptMethod(Member method, String dstName);
-		void acceptMethodArg(Member method, int lvIndex, String dstName);
-		void acceptMethodVar(Member method, int lvIndex, int startOpIdx, int asmIndex, String dstName);
-		void acceptField(Member field, String dstName);
-	}
+    public interface MappingAcceptor {
+        void acceptClass(String srcName, String dstName);
 
-	final class Member {
-		public Member(String owner, String name, String desc) {
-			this.owner = owner;
-			this.name = name;
-			this.desc = desc;
-		}
+        void acceptMethod(Member method, String dstName);
 
-		public String owner;
-		public String name;
-		public String desc;
-	}
+        void acceptMethodArg(Member method, int lvIndex, String dstName);
+
+        void acceptMethodVar(Member method, int lvIndex, int startOpIdx, int asmIndex, String dstName);
+
+        void acceptField(Member field, String dstName);
+    }
+
+    final class Member {
+        public String owner;
+        public String name;
+        public String desc;
+        public Member(String owner, String name, String desc) {
+            this.owner = owner;
+            this.name = name;
+            this.desc = desc;
+        }
+    }
 }

@@ -18,19 +18,8 @@
 
 package net.fabricmc.tinyremapper;
 
-import java.io.BufferedInputStream;
-import java.io.Closeable;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.file.FileAlreadyExistsException;
-import java.nio.file.FileSystems;
-import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.SimpleFileVisitor;
-import java.nio.file.StandardCopyOption;
+import java.io.*;
+import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.List;
 import java.util.Locale;
@@ -40,212 +29,232 @@ import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 
 public class OutputConsumerPath implements BiConsumer<String, byte[]>, Closeable {
-	public static class Builder {
-		public Builder(Path destination) {
-			this.destination = destination;
-		}
+    private static final String classSuffix = ".class";
+    private final Path dstDir;
+    private final FileSystemReference fsToClose;
+    private final boolean isJarFs;
+    private final Lock lock;
+    private final Predicate<String> classNameFilter;
+    private boolean closed;
 
-		public Builder assumeArchive(boolean value) {
-			this.assumeArchive = value;
-			return this;
-		}
+    @Deprecated
+    public OutputConsumerPath(Path dstFile) throws IOException {
+        this(dstFile, true);
+    }
 
-		/**
-		 * @deprecated no longer implemented, no-op
-		 */
-		@Deprecated
-		public Builder keepFsOpen(boolean value) {
-			return this;
-		}
+    @Deprecated
+    public OutputConsumerPath(Path dstDir, boolean closeFs) throws IOException {
+        this(dstDir, isJar(dstDir), false, null);
+    }
 
-		public Builder threadSyncWrites(boolean value) {
-			this.threadSyncWrites = value;
-			return this;
-		}
+    private OutputConsumerPath(
+        Path destination, boolean isJar, boolean threadSyncWrites,
+        Predicate<String> classNameFilter
+    ) throws IOException {
+        if (!isJar) { // TODO: implement .class output (for processing a single class file)
+            Files.createDirectories(destination);
+            fsToClose = null;
+        } else {
+            createParentDirs(destination);
 
-		public Builder filter(Predicate<String> classNameFilter) {
-			this.classNameFilter = classNameFilter;
-			return this;
-		}
+            fsToClose = FileSystemReference.openJar(destination, true);
+            if (fsToClose.isReadOnly()) throw new IOException("the jar file " + destination + " can't be written");
 
-		public OutputConsumerPath build() throws IOException {
-			boolean isJar = assumeArchive == null || Files.exists(destination) ? isJar(destination) : assumeArchive;
+            destination = fsToClose.getPath("/");
+        }
 
-			return new OutputConsumerPath(destination, isJar, threadSyncWrites, classNameFilter);
-		}
+        this.dstDir = destination;
+        this.isJarFs = isJar;
+        this.lock = threadSyncWrites ? new ReentrantLock() : null;
+        this.classNameFilter = classNameFilter;
+    }
 
-		private final Path destination;
-		private Boolean assumeArchive;
-		private boolean threadSyncWrites = false;
-		private Predicate<String> classNameFilter;
-	}
+    private static boolean isJar(Path path) {
+        if (Files.exists(path)) {
+            return !Files.isDirectory(path);
+        }
 
-	@Deprecated
-	public OutputConsumerPath(Path dstFile) throws IOException {
-		this(dstFile, true);
-	}
+        String name = path.getFileName().toString().toLowerCase(Locale.ENGLISH);
 
-	@Deprecated
-	public OutputConsumerPath(Path dstDir, boolean closeFs) throws IOException {
-		this(dstDir, isJar(dstDir), false, null);
-	}
+        return name.endsWith(".jar") || name.endsWith(".zip");
+    }
 
-	private OutputConsumerPath(Path destination, boolean isJar, boolean threadSyncWrites,
-			Predicate<String> classNameFilter) throws IOException {
-		if (!isJar) { // TODO: implement .class output (for processing a single class file)
-			Files.createDirectories(destination);
-			fsToClose = null;
-		} else {
-			createParentDirs(destination);
+    private static void createParentDirs(Path path) throws IOException {
+        Path parent = path.getParent();
+        if (parent != null) Files.createDirectories(parent);
+    }
 
-			fsToClose = FileSystemReference.openJar(destination, true);
-			if (fsToClose.isReadOnly()) throw new IOException("the jar file "+destination+" can't be written");
+    public void addNonClassFiles(Path srcFile) throws IOException {
+        addNonClassFiles(srcFile, NonClassCopyMode.UNCHANGED, null);
+    }
 
-			destination = fsToClose.getPath("/");
-		}
+    public void addNonClassFiles(Path srcDir, boolean closeFs) throws IOException {
+        addNonClassFiles(srcDir, NonClassCopyMode.UNCHANGED, null, closeFs);
+    }
 
-		this.dstDir = destination;
-		this.isJarFs = isJar;
-		this.lock = threadSyncWrites ? new ReentrantLock() : null;
-		this.classNameFilter = classNameFilter;
-	}
+    public void addNonClassFiles(Path srcFile, NonClassCopyMode copyMode, TinyRemapper remapper) throws IOException {
+        this.addNonClassFiles(srcFile, remapper, copyMode.remappers);
+    }
 
-	public void addNonClassFiles(Path srcFile) throws IOException {
-		addNonClassFiles(srcFile, NonClassCopyMode.UNCHANGED, null);
-	}
+    public void addNonClassFiles(
+        Path srcFile,
+        TinyRemapper remapper,
+        List<ResourceRemapper> remappers
+    ) throws IOException {
+        if (Files.isDirectory(srcFile)) {
+            addNonClassFiles(srcFile, remapper, false, remappers);
+        } else if (Files.exists(srcFile)) {
+            if (!srcFile.getFileName().toString().endsWith(classSuffix)) {
+                addNonClassFiles(FileSystems.newFileSystem(srcFile, (ClassLoader) null).getPath("/"), remapper, true, remappers);
+            }
+        } else {
+            throw new FileNotFoundException("file " + srcFile + " doesn't exist");
+        }
+    }
 
-	public void addNonClassFiles(Path srcDir, boolean closeFs) throws IOException {
-		addNonClassFiles(srcDir, NonClassCopyMode.UNCHANGED, null, closeFs);
-	}
+    public void addNonClassFiles(
+        Path srcDir,
+        NonClassCopyMode copyMode,
+        TinyRemapper remapper,
+        boolean closeFs
+    ) throws IOException {
+        this.addNonClassFiles(srcDir, remapper, closeFs, copyMode.remappers);
+    }
 
-	public void addNonClassFiles(Path srcFile, NonClassCopyMode copyMode, TinyRemapper remapper) throws IOException {
-		this.addNonClassFiles(srcFile, remapper, copyMode.remappers);
-	}
+    public void addNonClassFiles(
+        Path srcDir,
+        TinyRemapper remapper,
+        boolean closeFs,
+        List<ResourceRemapper> resourceRemappers
+    ) throws IOException {
+        try {
+            if (lock != null) lock.lock();
+            if (closed) throw new IllegalStateException("consumer already closed");
 
-	public void addNonClassFiles(Path srcFile, TinyRemapper remapper, List<ResourceRemapper> remappers) throws IOException {
-		if (Files.isDirectory(srcFile)) {
-			addNonClassFiles(srcFile, remapper, false, remappers);
-		} else if (Files.exists(srcFile)) {
-			if (!srcFile.getFileName().toString().endsWith(classSuffix)) {
-				addNonClassFiles(FileSystems.newFileSystem(srcFile, (ClassLoader) null).getPath("/"), remapper, true, remappers);
-			}
-		} else {
-			throw new FileNotFoundException("file "+srcFile+" doesn't exist");
-		}
-	}
+            Files.walkFileTree(srcDir, new SimpleFileVisitor<Path>() {
+                @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
+                    String fileName = file.getFileName().toString();
 
-	public void addNonClassFiles(Path srcDir, NonClassCopyMode copyMode, TinyRemapper remapper, boolean closeFs) throws IOException {
-		this.addNonClassFiles(srcDir, remapper, closeFs, copyMode.remappers);
-	}
+                    if (!fileName.endsWith(classSuffix)) {
+                        Path relativePath = srcDir.relativize(file);
+                        Path dstFile = dstDir.resolve(relativePath.toString()); // toString bypasses resolve requiring identical fs providers
 
-	public void addNonClassFiles(Path srcDir, TinyRemapper remapper, boolean closeFs, List<ResourceRemapper> resourceRemappers) throws IOException {
-		try {
-			if (lock != null) lock.lock();
-			if (closed) throw new IllegalStateException("consumer already closed");
+                        for (ResourceRemapper resourceRemapper : resourceRemappers) {
+                            if (resourceRemapper.canTransform(remapper, relativePath)) {
+                                try (InputStream input = new BufferedInputStream(Files.newInputStream(file))) {
+                                    resourceRemapper.transform(dstDir, relativePath, input, remapper);
+                                    return FileVisitResult.CONTINUE;
+                                }
+                            }
+                        }
 
-			Files.walkFileTree(srcDir, new SimpleFileVisitor<Path>() {
-				@Override
-				public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
-					String fileName = file.getFileName().toString();
+                        createParentDirs(dstFile);
+                        Files.copy(file, dstFile, StandardCopyOption.REPLACE_EXISTING);
+                    }
 
-					if (!fileName.endsWith(classSuffix)) {
-						Path relativePath = srcDir.relativize(file);
-						Path dstFile = dstDir.resolve(relativePath.toString()); // toString bypasses resolve requiring identical fs providers
+                    return FileVisitResult.CONTINUE;
+                }
+            });
+        } finally {
+            if (lock != null) lock.unlock();
 
-						for (ResourceRemapper resourceRemapper : resourceRemappers) {
-							if (resourceRemapper.canTransform(remapper, relativePath)) {
-								try (InputStream input = new BufferedInputStream(Files.newInputStream(file))) {
-									resourceRemapper.transform(dstDir, relativePath, input, remapper);
-									return FileVisitResult.CONTINUE;
-								}
-							}
-						}
+            if (closeFs) srcDir.getFileSystem().close();
+        }
+    }
 
-						createParentDirs(dstFile);
-						Files.copy(file, dstFile, StandardCopyOption.REPLACE_EXISTING);
-					}
+    @Override
+    public void accept(String clsName, byte[] data) {
+        if (classNameFilter != null && !classNameFilter.test(clsName)) return;
 
-					return FileVisitResult.CONTINUE;
-				}
-			});
-		} finally {
-			if (lock != null) lock.unlock();
+        Path dstFile = null;
 
-			if (closeFs) srcDir.getFileSystem().close();
-		}
-	}
+        try {
+            if (lock != null) lock.lock();
+            if (closed) throw new IllegalStateException("consumer already closed");
 
-	@Override
-	public void accept(String clsName, byte[] data) {
-		if (classNameFilter != null && !classNameFilter.test(clsName)) return;
+            dstFile = dstDir.resolve(clsName + classSuffix);
 
-		Path dstFile = null;
+            if (isJarFs && Files.exists(dstFile)) {
+                if (Files.isDirectory(dstFile))
+                    throw new FileAlreadyExistsException("dst file " + dstFile + " is a directory");
 
-		try {
-			if (lock != null) lock.lock();
-			if (closed) throw new IllegalStateException("consumer already closed");
+                Files.delete(dstFile); // workaround for sporadic FileAlreadyExistsException (Files.write should overwrite, jdk bug?)
+            }
 
-			dstFile = dstDir.resolve(clsName + classSuffix);
+            createParentDirs(dstFile);
+            Files.write(dstFile, data);
+        } catch (IOException e) {
+            throw new UncheckedIOException("error writing to " + dstFile, e);
+        } finally {
+            if (lock != null) lock.unlock();
+        }
+    }
 
-			if (isJarFs && Files.exists(dstFile)) {
-				if (Files.isDirectory(dstFile)) throw new FileAlreadyExistsException("dst file "+dstFile+" is a directory");
+    @Override
+    public void close() throws IOException {
+        if (closed) return;
 
-				Files.delete(dstFile); // workaround for sporadic FileAlreadyExistsException (Files.write should overwrite, jdk bug?)
-			}
+        try {
+            if (lock != null) lock.lock();
 
-			createParentDirs(dstFile);
-			Files.write(dstFile, data);
-		} catch (IOException e) {
-			throw new UncheckedIOException("error writing to "+dstFile, e);
-		} finally {
-			if (lock != null) lock.unlock();
-		}
-	}
+            if (fsToClose != null) {
+                fsToClose.close();
+            }
 
-	@Override
-	public void close() throws IOException {
-		if (closed) return;
+            closed = true;
+        } finally {
+            if (lock != null) lock.unlock();
+        }
+    }
+    public interface ResourceRemapper {
+        boolean canTransform(TinyRemapper remapper, Path relativePath);
 
-		try {
-			if (lock != null) lock.lock();
+        void transform(
+            Path destinationDirectory,
+            Path relativePath,
+            InputStream input,
+            TinyRemapper remapper
+        ) throws IOException;
+    }
 
-			if (fsToClose != null) {
-				fsToClose.close();
-			}
+    public static class Builder {
+        private final Path destination;
+        private Boolean assumeArchive;
+        private boolean threadSyncWrites = false;
+        private Predicate<String> classNameFilter;
 
-			closed = true;
-		} finally {
-			if (lock != null) lock.unlock();
-		}
-	}
+        public Builder(Path destination) {
+            this.destination = destination;
+        }
 
-	private static boolean isJar(Path path) {
-		if (Files.exists(path)) {
-			return !Files.isDirectory(path);
-		}
+        public Builder assumeArchive(boolean value) {
+            this.assumeArchive = value;
+            return this;
+        }
 
-		String name = path.getFileName().toString().toLowerCase(Locale.ENGLISH);
+        /**
+         * @deprecated no longer implemented, no-op
+         */
+        @Deprecated
+        public Builder keepFsOpen(boolean value) {
+            return this;
+        }
 
-		return name.endsWith(".jar") || name.endsWith(".zip");
-	}
+        public Builder threadSyncWrites(boolean value) {
+            this.threadSyncWrites = value;
+            return this;
+        }
 
-	private static void createParentDirs(Path path) throws IOException {
-		Path parent = path.getParent();
-		if (parent != null) Files.createDirectories(parent);
-	}
+        public Builder filter(Predicate<String> classNameFilter) {
+            this.classNameFilter = classNameFilter;
+            return this;
+        }
 
-	private static final String classSuffix = ".class";
+        public OutputConsumerPath build() throws IOException {
+            boolean isJar = assumeArchive == null || Files.exists(destination) ? isJar(destination) : assumeArchive;
 
-	private final Path dstDir;
-	private final FileSystemReference fsToClose;
-	private final boolean isJarFs;
-	private final Lock lock;
-	private final Predicate<String> classNameFilter;
-	private boolean closed;
-
-	public interface ResourceRemapper {
-		boolean canTransform(TinyRemapper remapper, Path relativePath);
-
-		void transform(Path destinationDirectory, Path relativePath, InputStream input, TinyRemapper remapper) throws IOException;
-	}
+            return new OutputConsumerPath(destination, isJar, threadSyncWrites, classNameFilter);
+        }
+    }
 }

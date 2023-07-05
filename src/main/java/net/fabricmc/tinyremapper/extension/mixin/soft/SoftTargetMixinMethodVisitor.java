@@ -32,43 +32,49 @@ import org.objectweb.asm.MethodVisitor;
 import java.util.Objects;
 
 class SoftTargetMixinMethodVisitor extends MethodVisitor {
-	private final CommonData data;
-	private final MxMember method;
+    private final CommonData data;
+    private final MxMember method;
 
-	private final boolean remap;
-	private final ObjectList<String> targets;
+    private final boolean remap;
+    private final ObjectList<String> targets;
 
-	SoftTargetMixinMethodVisitor(CommonData data, MethodVisitor delegate, MxMember method, boolean remap, ObjectList<String> targets) {
-		super(Constant.ASM_VERSION, delegate);
-		this.data = Objects.requireNonNull(data);
-		this.method = Objects.requireNonNull(method);
+    SoftTargetMixinMethodVisitor(
+        CommonData data,
+        MethodVisitor delegate,
+        MxMember method,
+        boolean remap,
+        ObjectList<String> targets
+    ) {
+        super(Constant.ASM_VERSION, delegate);
+        this.data = Objects.requireNonNull(data);
+        this.method = Objects.requireNonNull(method);
 
-		this.remap = remap;
-		this.targets = Objects.requireNonNull(targets);
-	}
+        this.remap = remap;
+        this.targets = Objects.requireNonNull(targets);
+    }
 
-	@Override
-	public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-		AnnotationVisitor av = super.visitAnnotation(descriptor, visible);
+    @Override
+    public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+        AnnotationVisitor av = super.visitAnnotation(descriptor, visible);
 
-		if (Annotation.ACCESSOR.equals(descriptor)) {
-			av = new AccessorAnnotationVisitor(data, av, method, remap, targets);
-		} else if (Annotation.INVOKER.equals(descriptor)) {
-			av = new InvokerAnnotationVisitor(data, av, method, remap, targets);
-		} else if (Annotation.INJECT.equals(descriptor)) {
-			av = new InjectAnnotationVisitor(data, av, remap, targets);
-		} else if (Annotation.MODIFY_ARG.equals(descriptor)) {
-			av = new ModifyArgAnnotationVisitor(data, av, remap, targets);
-		} else if (Annotation.MODIFY_ARGS.equals(descriptor)) {
-			av = new ModifyArgsAnnotationVisitor(data, av, remap, targets);
-		} else if (Annotation.MODIFY_CONSTANT.equals(descriptor)) {
-			av = new ModifyConstantAnnotationVisitor(data, av, remap, targets);
-		} else if (Annotation.MODIFY_VARIABLE.equals(descriptor)) {
-			av = new ModifyVariableAnnotationVisitor(data, av, remap, targets);
-		} else if (Annotation.REDIRECT.equals(descriptor)) {
-			av = new RedirectAnnotationVisitor(data, av, remap, targets);
-		}
+        if (Annotation.ACCESSOR.equals(descriptor)) {
+            av = new AccessorAnnotationVisitor(data, av, method, remap, targets);
+        } else if (Annotation.INVOKER.equals(descriptor)) {
+            av = new InvokerAnnotationVisitor(data, av, method, remap, targets);
+        } else if (Annotation.INJECT.equals(descriptor)) {
+            av = new InjectAnnotationVisitor(data, av, remap, targets);
+        } else if (Annotation.MODIFY_ARG.equals(descriptor)) {
+            av = new ModifyArgAnnotationVisitor(data, av, remap, targets);
+        } else if (Annotation.MODIFY_ARGS.equals(descriptor)) {
+            av = new ModifyArgsAnnotationVisitor(data, av, remap, targets);
+        } else if (Annotation.MODIFY_CONSTANT.equals(descriptor)) {
+            av = new ModifyConstantAnnotationVisitor(data, av, remap, targets);
+        } else if (Annotation.MODIFY_VARIABLE.equals(descriptor)) {
+            av = new ModifyVariableAnnotationVisitor(data, av, remap, targets);
+        } else if (Annotation.REDIRECT.equals(descriptor)) {
+            av = new RedirectAnnotationVisitor(data, av, remap, targets);
+        }
 
-		return av;
-	}
+        return av;
+    }
 }

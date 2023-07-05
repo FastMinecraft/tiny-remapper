@@ -39,80 +39,80 @@ import java.util.function.Consumer;
  * A extension for remapping mixin annotation.
  */
 public class MixinExtension implements TinyRemapper.Extension {
-	private final Logger logger;
-	private final Int2ObjectOpenHashMap<ObjectArrayList<Consumer<CommonData>>> tasks;
-	private final Set<AnnotationTarget> targets;
+    private final Logger logger;
+    private final Int2ObjectOpenHashMap<ObjectArrayList<Consumer<CommonData>>> tasks;
+    private final Set<AnnotationTarget> targets;
 
-	public enum AnnotationTarget {
-		/**
-		 * The string literal in mixin annotation. E.g. Mixin, Invoker, Accessor, Inject,
-		 * ModifyArg, ModifyArgs, Redirect, ModifyVariable, ModifyConstant, At, Slice.
-		 */
-		SOFT,
-		/**
-		 * The field or method with mixin annotation. E.g. Shadow, Overwrite, Accessor,
-		 * Invoker, Implements.
-		 */
-		HARD
-	}
+    /**
+     * Remap mixin annotation.
+     */
+    public MixinExtension() {
+        this(Level.WARN);
+    }
 
-	/**
-	 * Remap mixin annotation.
-	 */
-	public MixinExtension() {
-		this(Level.WARN);
-	}
+    public MixinExtension(Logger.Level logLevel) {
+        this(EnumSet.allOf(AnnotationTarget.class), logLevel);
+    }
 
-	public MixinExtension(Logger.Level logLevel) {
-		this(EnumSet.allOf(AnnotationTarget.class), logLevel);
-	}
+    public MixinExtension(Set<AnnotationTarget> targets) {
+        this(targets, Level.WARN);
+    }
 
-	public MixinExtension(Set<AnnotationTarget> targets) {
-		this(targets, Level.WARN);
-	}
+    public MixinExtension(Set<AnnotationTarget> targets, Logger.Level logLevel) {
+        this.logger = new Logger(logLevel);
+        this.tasks = new Int2ObjectOpenHashMap<>();
+        this.targets = targets;
+    }
 
-	public MixinExtension(Set<AnnotationTarget> targets, Logger.Level logLevel) {
-		this.logger = new Logger(logLevel);
-		this.tasks = new Int2ObjectOpenHashMap<>();
-		this.targets = targets;
-	}
+    @Override
+    public void attach(Builder builder) {
+        if (targets.contains(AnnotationTarget.HARD)) {
+            builder.extraAnalyzeVisitor(this::analyzeVisitor).extraStateProcessor(this::stateProcessor);
+        }
 
-	@Override
-	public void attach(Builder builder) {
-		if (targets.contains(AnnotationTarget.HARD)) {
-			builder.extraAnalyzeVisitor(this::analyzeVisitor).extraStateProcessor(this::stateProcessor);
-		}
+        if (targets.contains(AnnotationTarget.SOFT)) {
+            builder.extraPreApplyVisitor(this::preApplyVisitor);
+        }
+    }
 
-		if (targets.contains(AnnotationTarget.SOFT)) {
-			builder.extraPreApplyVisitor(this::preApplyVisitor);
-		}
-	}
+    /**
+     * Hard-target: Shadow, Overwrite, Accessor, Invoker, Implements.
+     */
+    private ClassVisitor analyzeVisitor(int mrjVersion, String className, ClassVisitor next) {
+        tasks.putIfAbsent(mrjVersion, new ObjectArrayList<>());
+        return new HardTargetMixinClassVisitor(tasks.get(mrjVersion), next);
+    }
 
-	/**
-	 * Hard-target: Shadow, Overwrite, Accessor, Invoker, Implements.
-	 */
-	private ClassVisitor analyzeVisitor(int mrjVersion, String className, ClassVisitor next) {
-		tasks.putIfAbsent(mrjVersion, new ObjectArrayList<>());
-		return new HardTargetMixinClassVisitor(tasks.get(mrjVersion), next);
-	}
+    private void stateProcessor(TrEnvironment environment) {
+        CommonData data = new CommonData(environment, logger);
 
-	private void stateProcessor(TrEnvironment environment) {
-		CommonData data = new CommonData(environment, logger);
+        for (Consumer<CommonData> task : tasks.get(environment.getMrjVersion())) {
+            try {
+                task.accept(data);
+            } catch (RuntimeException e) {
+                logger.error(e.getMessage());
+            }
+        }
+    }
 
-		for (Consumer<CommonData> task : tasks.get(environment.getMrjVersion())) {
-			try {
-				task.accept(data);
-			} catch (RuntimeException e) {
-				logger.error(e.getMessage());
-			}
-		}
-	}
+    /**
+     * Soft-target: Mixin, Invoker, Accessor, Inject, ModifyArg, ModifyArgs, Redirect, ModifyVariable, ModifyConstant, At, Slice.
+     */
+    public ClassVisitor preApplyVisitor(TrClass cls, ClassVisitor next) {
+        return new SoftTargetMixinClassVisitor(new CommonData(cls.getEnvironment(), logger), next);
+    }
 
-	/**
-	 * Soft-target: Mixin, Invoker, Accessor, Inject, ModifyArg, ModifyArgs, Redirect, ModifyVariable, ModifyConstant, At, Slice.
-	 */
-	public ClassVisitor preApplyVisitor(TrClass cls, ClassVisitor next) {
-		return new SoftTargetMixinClassVisitor(new CommonData(cls.getEnvironment(), logger), next);
-	}
+    public enum AnnotationTarget {
+        /**
+         * The string literal in mixin annotation. E.g. Mixin, Invoker, Accessor, Inject,
+         * ModifyArg, ModifyArgs, Redirect, ModifyVariable, ModifyConstant, At, Slice.
+         */
+        SOFT,
+        /**
+         * The field or method with mixin annotation. E.g. Shadow, Overwrite, Accessor,
+         * Invoker, Implements.
+         */
+        HARD
+    }
 }
 

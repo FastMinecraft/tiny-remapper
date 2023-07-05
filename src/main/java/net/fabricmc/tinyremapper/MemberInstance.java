@@ -18,141 +18,139 @@
 
 package net.fabricmc.tinyremapper;
 
-import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
-
-import org.objectweb.asm.Opcodes;
-
 import net.fabricmc.tinyremapper.TinyRemapper.MrjState;
 import net.fabricmc.tinyremapper.api.TrClass;
 import net.fabricmc.tinyremapper.api.TrField;
 import net.fabricmc.tinyremapper.api.TrMember;
 import net.fabricmc.tinyremapper.api.TrMethod;
+import org.objectweb.asm.Opcodes;
+
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 public final class MemberInstance implements TrField, TrMethod {
-	MemberInstance(TrMember.MemberType type, ClassInstance cls, String name, String desc, int access, int index) {
-		this.type = type;
-		this.cls = cls;
-		this.name = name;
-		this.desc = desc;
-		this.access = access;
-		this.index = index;
-	}
+    private static final AtomicReferenceFieldUpdater<MemberInstance, String> newNameUpdater = AtomicReferenceFieldUpdater.newUpdater(MemberInstance.class, String.class, "newName");
+    private static final AtomicReferenceFieldUpdater<MemberInstance, String> newBridgedNameUpdater = AtomicReferenceFieldUpdater.newUpdater(MemberInstance.class, String.class, "newBridgedName");
+    final TrMember.MemberType type;
+    final ClassInstance cls;
+    final String name;
+    final String desc;
+    final int access;
+    final int index;
+    String newNameOriginatingCls;
+    MemberInstance bridgeTarget;
+    private volatile String newName;
+    private volatile String newBridgedName;
 
-	@Override
-	public MemberType getType() {
-		return this.type;
-	}
+    MemberInstance(TrMember.MemberType type, ClassInstance cls, String name, String desc, int access, int index) {
+        this.type = type;
+        this.cls = cls;
+        this.name = name;
+        this.desc = desc;
+        this.access = access;
+        this.index = index;
+    }
 
-	@Override
-	public TrClass getOwner() {
-		return this.cls;
-	}
+    public static String getId(TrMember.MemberType type, String name, String desc, boolean ignoreFieldDesc) {
+        return type == TrMember.MemberType.METHOD ? getMethodId(name, desc) : getFieldId(name, desc, ignoreFieldDesc);
+    }
 
-	@Override
-	public String getName() {
-		return this.name;
-	}
+    public static String getMethodId(String name, String desc) {
+        return name.concat(desc);
+    }
 
-	@Override
-	public String getDesc() {
-		return this.desc;
-	}
+    public static String getFieldId(String name, String desc, boolean ignoreDesc) {
+        return ignoreDesc ? name : name + ";;" + desc;
+    }
 
-	@Override
-	public int getAccess() {
-		return this.access;
-	}
+    public static String getNameFromId(TrMember.MemberType type, String id, boolean ignoreFieldDesc) {
+        if (ignoreFieldDesc && type == TrMember.MemberType.FIELD) {
+            return id;
+        } else {
+            String separator = type == TrMember.MemberType.METHOD ? "(" : ";;";
+            int pos = id.lastIndexOf(separator);
+            if (pos < 0) throw new IllegalArgumentException(String.format("invalid %s id: %s", type.name(), id));
 
-	@Override
-	public int getIndex() {
-		return index;
-	}
+            return id.substring(0, pos);
+        }
+    }
 
-	public MrjState getContext() {
-		return cls.getContext();
-	}
+    @Override
+    public MemberType getType() {
+        return this.type;
+    }
 
-	public String getId() {
-		return getId(type, name, desc, cls.tr.ignoreFieldDesc);
-	}
+    @Override
+    public TrClass getOwner() {
+        return this.cls;
+    }
 
-	public boolean isPublicOrPrivate() {
-		return (access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PRIVATE)) != 0;
-	}
+    @Override
+    public String getName() {
+        return this.name;
+    }
 
-	@Override
-	public String getNewName() {
-		String ret = newBridgedName;
+    @Override
+    public String getDesc() {
+        return this.desc;
+    }
 
-		return ret != null ? ret : newName;
-	}
+    @Override
+    public int getAccess() {
+        return this.access;
+    }
 
-	public String getNewMappedName() {
-		return newName;
-	}
+    @Override
+    public int getIndex() {
+        return index;
+    }
 
-	public String getNewBridgedName() {
-		return newBridgedName;
-	}
+    public MrjState getContext() {
+        return cls.getContext();
+    }
 
-	public boolean setNewName(String name, boolean fromBridge) {
-		if (name == null) throw new NullPointerException("null name");
+    public String getId() {
+        return getId(type, name, desc, cls.tr.ignoreFieldDesc);
+    }
 
-		if (fromBridge) {
-			boolean ret = newBridgedNameUpdater.compareAndSet(this, null, name);
+    public boolean isPublicOrPrivate() {
+        return (access & (Opcodes.ACC_PUBLIC | Opcodes.ACC_PRIVATE)) != 0;
+    }
 
-			return ret || name.equals(newBridgedName);
-		} else {
-			boolean ret = newNameUpdater.compareAndSet(this, null, name);
+    @Override
+    public String getNewName() {
+        String ret = newBridgedName;
 
-			return ret || name.equals(newName);
-		}
-	}
+        return ret != null ? ret : newName;
+    }
 
-	public void forceSetNewName(String name) {
-		newName = name;
-	}
+    public String getNewMappedName() {
+        return newName;
+    }
 
-	@Override
-	public String toString() {
-		return String.format("%s/%s%s", cls.getName(), name, desc);
-	}
+    public String getNewBridgedName() {
+        return newBridgedName;
+    }
 
-	public static String getId(TrMember.MemberType type, String name, String desc, boolean ignoreFieldDesc) {
-		return type == TrMember.MemberType.METHOD ? getMethodId(name, desc) : getFieldId(name, desc, ignoreFieldDesc);
-	}
+    public boolean setNewName(String name, boolean fromBridge) {
+        if (name == null) throw new NullPointerException("null name");
 
-	public static String getMethodId(String name, String desc) {
-		return name.concat(desc);
-	}
+        if (fromBridge) {
+            boolean ret = newBridgedNameUpdater.compareAndSet(this, null, name);
 
-	public static String getFieldId(String name, String desc, boolean ignoreDesc) {
-		return ignoreDesc ? name : name+";;"+desc;
-	}
+            return ret || name.equals(newBridgedName);
+        } else {
+            boolean ret = newNameUpdater.compareAndSet(this, null, name);
 
-	public static String getNameFromId(TrMember.MemberType type, String id, boolean ignoreFieldDesc) {
-		if (ignoreFieldDesc && type == TrMember.MemberType.FIELD) {
-			return id;
-		} else {
-			String separator = type == TrMember.MemberType.METHOD ? "(" : ";;";
-			int pos = id.lastIndexOf(separator);
-			if (pos < 0) throw new IllegalArgumentException(String.format("invalid %s id: %s", type.name(), id));
+            return ret || name.equals(newName);
+        }
+    }
 
-			return id.substring(0, pos);
-		}
-	}
+    public void forceSetNewName(String name) {
+        newName = name;
+    }
 
-	private static final AtomicReferenceFieldUpdater<MemberInstance, String> newNameUpdater = AtomicReferenceFieldUpdater.newUpdater(MemberInstance.class, String.class, "newName");
-	private static final AtomicReferenceFieldUpdater<MemberInstance, String> newBridgedNameUpdater = AtomicReferenceFieldUpdater.newUpdater(MemberInstance.class, String.class, "newBridgedName");
-
-	final TrMember.MemberType type;
-	final ClassInstance cls;
-	final String name;
-	final String desc;
-	final int access;
-	final int index;
-	private volatile String newName;
-	private volatile String newBridgedName;
-	String newNameOriginatingCls;
-	MemberInstance bridgeTarget;
+    @Override
+    public String toString() {
+        return String.format("%s/%s%s", cls.getName(), name, desc);
+    }
 }

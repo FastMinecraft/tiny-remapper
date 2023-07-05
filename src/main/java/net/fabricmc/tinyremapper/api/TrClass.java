@@ -26,122 +26,158 @@ import org.objectweb.asm.Opcodes;
 import java.util.function.Predicate;
 
 public interface TrClass {
-	TrEnvironment getEnvironment();
+    TrEnvironment getEnvironment();
 
-	String getName();
-	String getSuperName();
-	ObjectList<String> getInterfaceNames();
-	String getSignature();
-	int getAccess();
+    String getName();
 
-	TrClass getSuperClass();
-	ObjectList<? extends TrClass> getInterfaces();
+    String getSuperName();
 
-	ObjectCollection<? extends TrClass> getParents();
-	ObjectCollection<? extends TrClass> getChildren();
+    ObjectList<String> getInterfaceNames();
 
-	TrField getField(String name, String desc);
-	TrMethod getMethod(String name, String desc);
+    String getSignature();
 
-	ObjectCollection<? extends TrField> getFields();
-	ObjectCollection<? extends TrMethod> getMethods();
-	ObjectCollection<? extends TrMember> getMembers();
+    int getAccess();
 
-	ObjectCollection<TrField> getFields(String name, String desc, boolean isDescPrefix, Predicate<TrField> filter, ObjectCollection<TrField> out);
-	ObjectCollection<TrMethod> getMethods(String name, String desc, boolean isDescPrefix, Predicate<TrMethod> filter, ObjectCollection<TrMethod> out);
+    TrClass getSuperClass();
 
-	TrField resolveField(String name, String desc);
-	TrMethod resolveMethod(String name, String desc);
+    ObjectList<? extends TrClass> getInterfaces();
 
-	/**
-	 * Get fields in the class, including the one inherited from super-class or super-interfaces, satisfy the search query.
-	 *
-	 * @param name         the name of the field. Nullable.
-	 * @param desc         the descriptor (or descriptor prefix) of the field. Nullable.
-	 * @param isDescPrefix is {@code descPrefix} a full qualified descriptor or a prefix.
-	 * @param filter       any additional constraint. Nullable.
-	 * @param out          if not {@code null}, then reuse this collection instead of allocate a new one. The behaviour
-	 *                     is undefined is the collection is non-empty. Nullable.
-	 * @return the query result.
-	 */
-	ObjectCollection<TrField> resolveFields(String name, String desc, boolean isDescPrefix, Predicate<TrField> filter, ObjectCollection<TrField> out);
+    ObjectCollection<? extends TrClass> getParents();
 
-	/**
-	 * Get methods in the class, including the one inherited from super-class or super-interfaces, satisfy the search query.
-	 *
-	 * @param name         the name of the method. Nullable.
-	 * @param desc         the descriptor (or descriptor prefix) of the method. Nullable.
-	 * @param isDescPrefix is {@code descPrefix} a full qualified descriptor or a prefix.
-	 * @param filter       any additional constraint. Nullable.
-	 * @param out          if not {@code null}, then reuse this collection instead of the internal one. The behaviour
-	 *                     is undefined is the collection is non-empty. Nullable.
-	 * @return the query result.
-	 */
-	ObjectCollection<TrMethod> resolveMethods(String name, String desc, boolean isDescPrefix, Predicate<TrMethod> filter, ObjectCollection<TrMethod> out);
+    ObjectCollection<? extends TrClass> getChildren();
 
-	boolean isAssignableFrom(TrClass cls);
-	void accept(ClassVisitor cv, int readerFlags);
+    TrField getField(String name, String desc);
 
-	/**
-	 * May be accessed from outside its package.
-	 */
-	default boolean isPublic() {
-		return (getAccess() & Opcodes.ACC_PUBLIC) != 0;
-	}
+    TrMethod getMethod(String name, String desc);
 
-	/**
-	 * No subclasses allowed.
-	 */
-	default boolean isFinal() {
-		return (getAccess() & Opcodes.ACC_FINAL) != 0;
-	}
+    ObjectCollection<? extends TrField> getFields();
 
-	/**
-	 * Is an interface, not a class.
-	 */
-	default boolean isInterface() {
-		return (getAccess() & Opcodes.ACC_INTERFACE) != 0;
-	}
+    ObjectCollection<? extends TrMethod> getMethods();
 
-	/**
-	 * Declared {@code abstract}; must not be instantiated.
-	 */
-	default boolean isAbstract() {
-		return (getAccess() & Opcodes.ACC_ABSTRACT) != 0;
-	}
+    ObjectCollection<? extends TrMember> getMembers();
 
-	/**
-	 * Declared {@code synthetic}; not present in the source code.
-	 */
-	default boolean isSynthetic() {
-		return (getAccess() & Opcodes.ACC_SYNTHETIC) != 0;
-	}
+    ObjectCollection<TrField> getFields(
+        String name,
+        String desc,
+        boolean isDescPrefix,
+        Predicate<TrField> filter,
+        ObjectCollection<TrField> out
+    );
 
-	/**
-	 * Declared as an annotation interface.
-	 */
-	default boolean isAnnotation() {
-		return (getAccess() & Opcodes.ACC_ANNOTATION) != 0;
-	}
+    ObjectCollection<TrMethod> getMethods(
+        String name,
+        String desc,
+        boolean isDescPrefix,
+        Predicate<TrMethod> filter,
+        ObjectCollection<TrMethod> out
+    );
 
-	/**
-	 * Declared as an enum class.
-	 */
-	default boolean isEnum() {
-		return (getAccess() & Opcodes.ACC_ENUM) != 0;
-	}
+    TrField resolveField(String name, String desc);
 
-	/**
-	 * Declare as a record class.
-	 */
-	default boolean isRecord() {
-		return (getAccess() & Opcodes.ACC_RECORD) != 0;
-	}
+    TrMethod resolveMethod(String name, String desc);
 
-	/**
-	 * Is a module, not a class or interface.
-	 */
-	default boolean isModule() {
-		return (getAccess() & Opcodes.ACC_MODULE) != 0;
-	}
+    /**
+     * Get fields in the class, including the one inherited from super-class or super-interfaces, satisfy the search query.
+     *
+     * @param name         the name of the field. Nullable.
+     * @param desc         the descriptor (or descriptor prefix) of the field. Nullable.
+     * @param isDescPrefix is {@code descPrefix} a full qualified descriptor or a prefix.
+     * @param filter       any additional constraint. Nullable.
+     * @param out          if not {@code null}, then reuse this collection instead of allocate a new one. The behaviour
+     *                     is undefined is the collection is non-empty. Nullable.
+     * @return the query result.
+     */
+    ObjectCollection<TrField> resolveFields(
+        String name,
+        String desc,
+        boolean isDescPrefix,
+        Predicate<TrField> filter,
+        ObjectCollection<TrField> out
+    );
+
+    /**
+     * Get methods in the class, including the one inherited from super-class or super-interfaces, satisfy the search query.
+     *
+     * @param name         the name of the method. Nullable.
+     * @param desc         the descriptor (or descriptor prefix) of the method. Nullable.
+     * @param isDescPrefix is {@code descPrefix} a full qualified descriptor or a prefix.
+     * @param filter       any additional constraint. Nullable.
+     * @param out          if not {@code null}, then reuse this collection instead of the internal one. The behaviour
+     *                     is undefined is the collection is non-empty. Nullable.
+     * @return the query result.
+     */
+    ObjectCollection<TrMethod> resolveMethods(
+        String name,
+        String desc,
+        boolean isDescPrefix,
+        Predicate<TrMethod> filter,
+        ObjectCollection<TrMethod> out
+    );
+
+    boolean isAssignableFrom(TrClass cls);
+
+    void accept(ClassVisitor cv, int readerFlags);
+
+    /**
+     * May be accessed from outside its package.
+     */
+    default boolean isPublic() {
+        return (getAccess() & Opcodes.ACC_PUBLIC) != 0;
+    }
+
+    /**
+     * No subclasses allowed.
+     */
+    default boolean isFinal() {
+        return (getAccess() & Opcodes.ACC_FINAL) != 0;
+    }
+
+    /**
+     * Is an interface, not a class.
+     */
+    default boolean isInterface() {
+        return (getAccess() & Opcodes.ACC_INTERFACE) != 0;
+    }
+
+    /**
+     * Declared {@code abstract}; must not be instantiated.
+     */
+    default boolean isAbstract() {
+        return (getAccess() & Opcodes.ACC_ABSTRACT) != 0;
+    }
+
+    /**
+     * Declared {@code synthetic}; not present in the source code.
+     */
+    default boolean isSynthetic() {
+        return (getAccess() & Opcodes.ACC_SYNTHETIC) != 0;
+    }
+
+    /**
+     * Declared as an annotation interface.
+     */
+    default boolean isAnnotation() {
+        return (getAccess() & Opcodes.ACC_ANNOTATION) != 0;
+    }
+
+    /**
+     * Declared as an enum class.
+     */
+    default boolean isEnum() {
+        return (getAccess() & Opcodes.ACC_ENUM) != 0;
+    }
+
+    /**
+     * Declare as a record class.
+     */
+    default boolean isRecord() {
+        return (getAccess() & Opcodes.ACC_RECORD) != 0;
+    }
+
+    /**
+     * Is a module, not a class or interface.
+     */
+    default boolean isModule() {
+        return (getAccess() & Opcodes.ACC_MODULE) != 0;
+    }
 }

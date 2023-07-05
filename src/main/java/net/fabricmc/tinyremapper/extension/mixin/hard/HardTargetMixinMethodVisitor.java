@@ -34,35 +34,41 @@ import java.util.Objects;
 import java.util.function.Consumer;
 
 class HardTargetMixinMethodVisitor extends MethodVisitor {
-	private final ObjectList<Consumer<CommonData>> data;
-	private final MxMember method;
+    private final ObjectList<Consumer<CommonData>> data;
+    private final MxMember method;
 
-	private final boolean remap;
-	private final ObjectList<String> targets;
+    private final boolean remap;
+    private final ObjectList<String> targets;
 
-	HardTargetMixinMethodVisitor(ObjectList<Consumer<CommonData>> data, MethodVisitor delegate, MxMember method, boolean remap, ObjectList<String> targets) {
-		super(Constant.ASM_VERSION, delegate);
-		this.data = Objects.requireNonNull(data);
-		this.method = Objects.requireNonNull(method);
+    HardTargetMixinMethodVisitor(
+        ObjectList<Consumer<CommonData>> data,
+        MethodVisitor delegate,
+        MxMember method,
+        boolean remap,
+        ObjectList<String> targets
+    ) {
+        super(Constant.ASM_VERSION, delegate);
+        this.data = Objects.requireNonNull(data);
+        this.method = Objects.requireNonNull(method);
 
-		this.remap = remap;
-		this.targets = Objects.requireNonNull(targets);
-	}
+        this.remap = remap;
+        this.targets = Objects.requireNonNull(targets);
+    }
 
-	@Override
-	public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-		AnnotationVisitor av = super.visitAnnotation(descriptor, visible);
+    @Override
+    public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+        AnnotationVisitor av = super.visitAnnotation(descriptor, visible);
 
-		if (Annotation.SHADOW.equals(descriptor)) {
-			av = new ShadowAnnotationVisitor(data, av, method, remap, targets);
-		} else if (Annotation.OVERWRITE.equals(descriptor)) {
-			av = new OverwriteAnnotationVisitor(data, av, method, remap, targets);
-		} else if (Annotation.ACCESSOR.equals(descriptor)) {
-			av = new AccessorAnnotationVisitor(data, av, method, remap, targets);
-		} else if (Annotation.INVOKER.equals(descriptor)) {
-			av = new InvokerAnnotationVisitor(data, av, method, remap, targets);
-		}
+        if (Annotation.SHADOW.equals(descriptor)) {
+            av = new ShadowAnnotationVisitor(data, av, method, remap, targets);
+        } else if (Annotation.OVERWRITE.equals(descriptor)) {
+            av = new OverwriteAnnotationVisitor(data, av, method, remap, targets);
+        } else if (Annotation.ACCESSOR.equals(descriptor)) {
+            av = new AccessorAnnotationVisitor(data, av, method, remap, targets);
+        } else if (Annotation.INVOKER.equals(descriptor)) {
+            av = new InvokerAnnotationVisitor(data, av, method, remap, targets);
+        }
 
-		return av;
-	}
+        return av;
+    }
 }

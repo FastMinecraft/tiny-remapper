@@ -32,68 +32,78 @@ import java.util.regex.Pattern;
  * an error message will show up and the behaviour is undefined.
  */
 public class AccessorAnnotationVisitor extends FirstPassAnnotationVisitor {
-	private final CommonData data;
-	private final AnnotationVisitor delegate;
-	private final MxMember method;
+    private final CommonData data;
+    private final AnnotationVisitor delegate;
+    private final MxMember method;
 
-	private final ObjectList<String> targets;
+    private final ObjectList<String> targets;
 
-	public AccessorAnnotationVisitor(CommonData data, AnnotationVisitor delegate, MxMember method, boolean remap, ObjectList<String> targets) {
-		super(Annotation.ACCESSOR, remap);
+    public AccessorAnnotationVisitor(
+        CommonData data,
+        AnnotationVisitor delegate,
+        MxMember method,
+        boolean remap,
+        ObjectList<String> targets
+    ) {
+        super(Annotation.ACCESSOR, remap);
 
-		this.data = Objects.requireNonNull(data);
-		this.delegate = Objects.requireNonNull(delegate);
-		this.method = Objects.requireNonNull(method);
+        this.data = Objects.requireNonNull(data);
+        this.delegate = Objects.requireNonNull(delegate);
+        this.method = Objects.requireNonNull(method);
 
-		this.targets = Objects.requireNonNull(targets);
-	}
+        this.targets = Objects.requireNonNull(targets);
+    }
 
-	@Override
-	public void visitEnd() {
-		if (super.remap) {
-			this.accept(new AccessorSecondPassAnnotationVisitor(data, delegate, method, targets));
-		} else {
-			this.accept(delegate);
-		}
+    @Override
+    public void visitEnd() {
+        if (super.remap) {
+            this.accept(new AccessorSecondPassAnnotationVisitor(data, delegate, method, targets));
+        } else {
+            this.accept(delegate);
+        }
 
-		super.visitEnd();
-	}
+        super.visitEnd();
+    }
 
-	private static class AccessorSecondPassAnnotationVisitor extends AnnotationVisitor {
-		private final CommonData data;
-		private final ObjectList<String> targets;
-		private final String fieldDesc;
+    private static class AccessorSecondPassAnnotationVisitor extends AnnotationVisitor {
+        private static final Pattern GETTER_PATTERN = Pattern.compile("(?<=\\(\\)).*");
+        private static final Pattern SETTER_PATTERN = Pattern.compile("(?<=\\().*(?=\\)V)");
+        private final CommonData data;
+        private final ObjectList<String> targets;
+        private final String fieldDesc;
 
-		private static final Pattern GETTER_PATTERN = Pattern.compile("(?<=\\(\\)).*");
-		private static final Pattern SETTER_PATTERN = Pattern.compile("(?<=\\().*(?=\\)V)");
+        AccessorSecondPassAnnotationVisitor(
+            CommonData data,
+            AnnotationVisitor delegate,
+            MxMember method,
+            ObjectList<String> targets
+        ) {
+            super(Constant.ASM_VERSION, delegate);
 
-		AccessorSecondPassAnnotationVisitor(CommonData data, AnnotationVisitor delegate, MxMember method, ObjectList<String> targets) {
-			super(Constant.ASM_VERSION, delegate);
+            this.data = Objects.requireNonNull(data);
+            this.targets = Objects.requireNonNull(targets);
 
-			this.data = Objects.requireNonNull(data);
-			this.targets = Objects.requireNonNull(targets);
+            Matcher getterMatcher = GETTER_PATTERN.matcher(method.getDesc());
+            Matcher setterMatcher = SETTER_PATTERN.matcher(method.getDesc());
 
-			Matcher getterMatcher = GETTER_PATTERN.matcher(method.getDesc());
-			Matcher setterMatcher = SETTER_PATTERN.matcher(method.getDesc());
+            if (getterMatcher.find()) {
+                this.fieldDesc = getterMatcher.group();
+            } else if (setterMatcher.find()) {
+                this.fieldDesc = setterMatcher.group();
+            } else {
+                throw new RuntimeException(method.getDesc() + " is not getter or setter");
+            }
+        }
 
-			if (getterMatcher.find()) {
-				this.fieldDesc = getterMatcher.group();
-			} else if (setterMatcher.find()) {
-				this.fieldDesc = setterMatcher.group();
-			} else {
-				throw new RuntimeException(method.getDesc() + " is not getter or setter");
-			}
-		}
+        @Override
+        public void visit(String name, Object value) {
+            if (name.equals(AnnotationElement.VALUE)) {
+                String fieldName = Objects.requireNonNull((String) value);
 
-		@Override
-		public void visit(String name, Object value) {
-			if (name.equals(AnnotationElement.VALUE)) {
-				String fieldName = Objects.requireNonNull((String) value);
+                value = new NamedMappable(data, fieldName, fieldDesc, targets).result();
+            }
 
-				value = new NamedMappable(data, fieldName, fieldDesc, targets).result();
-			}
-
-			super.visit(name, value);
-		}
-	}
+            super.visit(name, value);
+        }
+    }
 }

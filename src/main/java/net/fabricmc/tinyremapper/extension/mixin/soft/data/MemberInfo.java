@@ -18,119 +18,119 @@
 
 package net.fabricmc.tinyremapper.extension.mixin.soft.data;
 
-import java.util.Objects;
-
 import net.fabricmc.tinyremapper.api.TrMember.MemberType;
 import net.fabricmc.tinyremapper.extension.mixin.common.StringUtility;
 
+import java.util.Objects;
+
 public final class MemberInfo {
-	private final String owner;		// desc
-	private final String name;		// name
-	private final String quantifier;
-	private final String desc;		// desc
+    private final String owner;        // desc
+    private final String name;        // name
+    private final String quantifier;
+    private final String desc;        // desc
 
-	public MemberInfo(String owner, String name, String quantifier, String desc) {
-		this.owner = Objects.requireNonNull(owner);
-		this.name = Objects.requireNonNull(name);
-		this.quantifier = Objects.requireNonNull(quantifier);
-		this.desc = Objects.requireNonNull(desc);
-	}
+    public MemberInfo(String owner, String name, String quantifier, String desc) {
+        this.owner = Objects.requireNonNull(owner);
+        this.name = Objects.requireNonNull(name);
+        this.quantifier = Objects.requireNonNull(quantifier);
+        this.desc = Objects.requireNonNull(desc);
+    }
 
-	public String getOwner() {
-		return owner;
-	}
+    public static boolean isRegex(String str) {
+        return str.endsWith("/");
+    }
 
-	public String getName() {
-		return name;
-	}
+    public static boolean isDynamic(String str) {
+        return str.startsWith("@");
+    }
 
-	public String getQuantifier() {
-		return quantifier;
-	}
+    public static MemberInfo parse(String str) {
+        if (isRegex(str) || isDynamic(str)) {
+            return null;
+        }
 
-	public String getDesc() {
-		return desc;
-	}
+        str = str.replaceAll("\\s", "");
 
-	public MemberType getType() {
-		if (desc.isEmpty()) {
-			return null;
-		}
+        // str = owner | name | quantifier | descriptor
 
-		return StringUtility.isMethodDesc(desc) ? MemberType.METHOD : MemberType.FIELD;
-	}
+        int sep;
+        String owner, name, quantifier, descriptor;
+        owner = name = quantifier = descriptor = "";
 
-	public boolean isFullyQualified() {
-		return !(owner.isEmpty() || name.isEmpty() || desc.isEmpty());
-	}
+        if ((sep = str.indexOf('(')) >= 0) {
+            descriptor = str.substring(sep);
+            str = str.substring(0, sep);
+        } else if ((sep = str.indexOf(":")) >= 0) {
+            descriptor = str.substring(sep + 1);
+            str = str.substring(0, sep);
+        }
 
-	public static boolean isRegex(String str) {
-		return str.endsWith("/");
-	}
+        // str = owner | name | quantifier
 
-	public static boolean isDynamic(String str) {
-		return str.startsWith("@");
-	}
+        if ((sep = str.indexOf('*')) >= 0) {
+            quantifier = str.substring(sep);
+            str = str.substring(0, sep);
+        } else if ((sep = str.indexOf('+')) >= 0) {
+            quantifier = str.substring(sep);
+            str = str.substring(0, sep);
+        } else if ((sep = str.indexOf('{')) >= 0) {
+            quantifier = str.substring(sep);
+            str = str.substring(0, sep);
+        }
 
-	public static MemberInfo parse(String str) {
-		if (isRegex(str) || isDynamic(str)) {
-			return null;
-		}
+        // str = owner | name
 
-		str = str.replaceAll("\\s", "");
+        if ((sep = str.indexOf(';')) >= 0) {
+            owner = StringUtility.classDescToName(str.substring(0, sep + 1));
+            str = str.substring(sep + 1);
+        } else if ((sep = str.lastIndexOf('.')) >= 0) {
+            owner = str.substring(0, sep).replace('.', '/');
+            str = str.substring(sep + 1);
+        }
 
-		// str = owner | name | quantifier | descriptor
+        // str = owner or name
+        if (str.contains("/") || str.contains(".")) {
+            owner = str.replace('.', '/');
+        } else {
+            name = str;
+        }
 
-		int sep;
-		String owner, name, quantifier, descriptor;
-		owner = name = quantifier = descriptor = "";
+        return new MemberInfo(owner, name, quantifier, descriptor);
+    }
 
-		if ((sep = str.indexOf('(')) >= 0) {
-			descriptor = str.substring(sep);
-			str = str.substring(0, sep);
-		} else if ((sep = str.indexOf(":")) >= 0) {
-			descriptor = str.substring(sep + 1);
-			str = str.substring(0, sep);
-		}
+    public String getOwner() {
+        return owner;
+    }
 
-		// str = owner | name | quantifier
+    public String getName() {
+        return name;
+    }
 
-		if ((sep = str.indexOf('*')) >= 0) {
-			quantifier = str.substring(sep);
-			str = str.substring(0, sep);
-		} else if ((sep = str.indexOf('+')) >= 0) {
-			quantifier = str.substring(sep);
-			str = str.substring(0, sep);
-		} else if ((sep = str.indexOf('{')) >= 0) {
-			quantifier = str.substring(sep);
-			str = str.substring(0, sep);
-		}
+    public String getQuantifier() {
+        return quantifier;
+    }
 
-		// str = owner | name
+    public String getDesc() {
+        return desc;
+    }
 
-		if ((sep = str.indexOf(';')) >= 0) {
-			owner = StringUtility.classDescToName(str.substring(0, sep + 1));
-			str = str.substring(sep + 1);
-		} else if ((sep = str.lastIndexOf('.')) >= 0) {
-			owner = str.substring(0, sep).replace('.', '/');
-			str = str.substring(sep + 1);
-		}
+    public MemberType getType() {
+        if (desc.isEmpty()) {
+            return null;
+        }
 
-		// str = owner or name
-		if (str.contains("/") || str.contains(".")) {
-			owner = str.replace('.', '/');
-		} else {
-			name = str;
-		}
+        return StringUtility.isMethodDesc(desc) ? MemberType.METHOD : MemberType.FIELD;
+    }
 
-		return new MemberInfo(owner, name, quantifier, descriptor);
-	}
+    public boolean isFullyQualified() {
+        return !(owner.isEmpty() || name.isEmpty() || desc.isEmpty());
+    }
 
-	@Override
-	public String toString() {
-		String owner = getOwner().isEmpty() ? "" : StringUtility.classNameToDesc(getOwner());
-		String desc = getDesc().isEmpty() ? "" : (Objects.equals(getType(), MemberType.FIELD) ? ":" : "") + getDesc();
+    @Override
+    public String toString() {
+        String owner = getOwner().isEmpty() ? "" : StringUtility.classNameToDesc(getOwner());
+        String desc = getDesc().isEmpty() ? "" : (Objects.equals(getType(), MemberType.FIELD) ? ":" : "") + getDesc();
 
-		return owner + name + quantifier + desc;
-	}
+        return owner + name + quantifier + desc;
+    }
 }

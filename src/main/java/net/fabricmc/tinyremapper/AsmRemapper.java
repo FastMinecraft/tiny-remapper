@@ -29,147 +29,155 @@ import org.objectweb.asm.Type;
 import java.util.Collection;
 
 class AsmRemapper extends TrRemapper {
-	AsmRemapper(MrjState context) {
-		this.context = context;
-		this.tr = context.getTr();
-	}
+    final MrjState context;
+    final TinyRemapper tr;
 
-	@Override
-	public String map(String typeName) {
-		String ret = tr.classMap.get(typeName);
-		if (ret != null) return ret;
+    AsmRemapper(MrjState context) {
+        this.context = context;
+        this.tr = context.getTr();
+    }
 
-		return tr.extraRemapper != null ? tr.extraRemapper.map(typeName) : typeName;
-	}
+    @Override
+    public String map(String typeName) {
+        String ret = tr.classMap.get(typeName);
+        if (ret != null) return ret;
 
-	@Override
-	public String mapFieldName(String owner, String name, String desc) {
-		ClassInstance cls = getClass(owner);
-		if (cls == null) return name;
+        return tr.extraRemapper != null ? tr.extraRemapper.map(typeName) : typeName;
+    }
 
-		return mapFieldName(cls, name, desc);
-	}
+    @Override
+    public String mapFieldName(String owner, String name, String desc) {
+        ClassInstance cls = getClass(owner);
+        if (cls == null) return name;
 
-	final String mapFieldName(ClassInstance cls, String name, String desc) {
-		MemberInstance member = cls.resolve(TrMember.MemberType.FIELD, MemberInstance.getFieldId(name, desc, tr.ignoreFieldDesc));
-		String newName;
+        return mapFieldName(cls, name, desc);
+    }
 
-		if (member != null && (newName = member.getNewName()) != null) {
-			return newName;
-		}
+    final String mapFieldName(ClassInstance cls, String name, String desc) {
+        MemberInstance member = cls.resolve(TrMember.MemberType.FIELD, MemberInstance.getFieldId(name, desc, tr.ignoreFieldDesc));
+        String newName;
 
-		assert (newName = tr.fieldMap.get(cls.getName()+"/"+MemberInstance.getFieldId(name, desc, tr.ignoreFieldDesc))) == null || newName.equals(name);
+        if (member != null && (newName = member.getNewName()) != null) {
+            return newName;
+        }
 
-		return tr.extraRemapper != null ? tr.extraRemapper.mapFieldName(cls.getName(), name, desc) : name;
-	}
+        assert (newName = tr.fieldMap.get(cls.getName() + "/" + MemberInstance.getFieldId(name, desc, tr.ignoreFieldDesc))) == null || newName.equals(name);
 
-	@Override
-	public String mapRecordComponentName(String owner, String name, String descriptor) {
-		return mapFieldName(owner, name, descriptor);
-	}
+        return tr.extraRemapper != null ? tr.extraRemapper.mapFieldName(cls.getName(), name, desc) : name;
+    }
 
-	@Override
-	public String mapMethodName(String owner, String name, String desc) {
-		if (!desc.startsWith("(")) { // workaround for Remapper.mapValue calling mapMethodName even if the Handle is a field one
-			return mapFieldName(owner, name, desc);
-		}
+    @Override
+    public String mapRecordComponentName(String owner, String name, String descriptor) {
+        return mapFieldName(owner, name, descriptor);
+    }
 
-		ClassInstance cls = getClass(owner);
-		if (cls == null) return name; // TODO: try to map these from just the mappings?, warn if actual class is missing
+    @Override
+    public String mapMethodName(String owner, String name, String desc) {
+        if (!desc.startsWith("(")) { // workaround for Remapper.mapValue calling mapMethodName even if the Handle is a field one
+            return mapFieldName(owner, name, desc);
+        }
 
-		return mapMethodName(cls, name, desc);
-	}
+        ClassInstance cls = getClass(owner);
+        if (cls == null) return name; // TODO: try to map these from just the mappings?, warn if actual class is missing
 
-	final String mapMethodName(ClassInstance cls, String name, String desc) {
-		MemberInstance member = cls.resolve(TrMember.MemberType.METHOD, MemberInstance.getMethodId(name, desc));
-		String newName;
+        return mapMethodName(cls, name, desc);
+    }
 
-		if (member != null && (newName = member.getNewName()) != null) {
-			return newName;
-		}
+    final String mapMethodName(ClassInstance cls, String name, String desc) {
+        MemberInstance member = cls.resolve(TrMember.MemberType.METHOD, MemberInstance.getMethodId(name, desc));
+        String newName;
 
-		assert (newName = tr.methodMap.get(cls.getName()+"/"+MemberInstance.getMethodId(name, desc))) == null || newName.equals(name);
+        if (member != null && (newName = member.getNewName()) != null) {
+            return newName;
+        }
 
-		return tr.extraRemapper != null ? tr.extraRemapper.mapMethodName(cls.getName(), name, desc) : name;
-	}
+        assert (newName = tr.methodMap.get(cls.getName() + "/" + MemberInstance.getMethodId(name, desc))) == null || newName.equals(name);
 
-	@Override
-	public String mapMethodNamePrefixDesc(String owner, String name, String descPrefix) {
-		ClassInstance cls = getClass(owner);
-		if (cls == null) return name;
+        return tr.extraRemapper != null ? tr.extraRemapper.mapMethodName(cls.getName(), name, desc) : name;
+    }
 
-		Collection<TrMethod> members = cls.resolveMethods(name, descPrefix, true, null, null);
-		MemberInstance member = members.size() == 1 ? (MemberInstance) members.iterator().next() : null;
-		String newName;
+    @Override
+    public String mapMethodNamePrefixDesc(String owner, String name, String descPrefix) {
+        ClassInstance cls = getClass(owner);
+        if (cls == null) return name;
 
-		if (member != null && (newName = member.getNewName()) != null) {
-			return newName;
-		}
+        Collection<TrMethod> members = cls.resolveMethods(name, descPrefix, true, null, null);
+        MemberInstance member = members.size() == 1 ? (MemberInstance) members.iterator().next() : null;
+        String newName;
 
-		return name;
-	}
+        if (member != null && (newName = member.getNewName()) != null) {
+            return newName;
+        }
 
-	public String mapLambdaInvokeDynamicMethodName(String owner, String name, String desc) {
-		return mapMethodName(owner, name, desc);
-	}
+        return name;
+    }
 
-	public String mapArbitraryInvokeDynamicMethodName(String owner, String name) {
-		return mapMethodNamePrefixDesc(owner, name, null);
-	}
+    public String mapLambdaInvokeDynamicMethodName(String owner, String name, String desc) {
+        return mapMethodName(owner, name, desc);
+    }
 
-	@Override
-	public String mapMethodArg(String methodOwner, String methodName, String methodDesc, int lvIndex, String name) {
-		String newName = tr.methodArgMap.get(methodOwner+"/"+MemberInstance.getMethodId(methodName, methodDesc)+lvIndex);
-		if (newName != null) return newName;
+    public String mapArbitraryInvokeDynamicMethodName(String owner, String name) {
+        return mapMethodNamePrefixDesc(owner, name, null);
+    }
 
-		ClassInstance cls = getClass(methodOwner);
-		if (cls == null) return name;
+    @Override
+    public String mapMethodArg(String methodOwner, String methodName, String methodDesc, int lvIndex, String name) {
+        String newName = tr.methodArgMap.get(methodOwner + "/" + MemberInstance.getMethodId(methodName, methodDesc) + lvIndex);
+        if (newName != null) return newName;
 
-		MemberInstance originatingMethod = cls.resolve(TrMember.MemberType.METHOD, MemberInstance.getMethodId(methodName, methodDesc));
-		if (originatingMethod == null) return name;
+        ClassInstance cls = getClass(methodOwner);
+        if (cls == null) return name;
 
-		String originatingNewName = tr.methodArgMap.get(originatingMethod.newNameOriginatingCls+"/"+MemberInstance.getMethodId(originatingMethod.name, originatingMethod.desc)+lvIndex);
+        MemberInstance originatingMethod = cls.resolve(TrMember.MemberType.METHOD, MemberInstance.getMethodId(methodName, methodDesc));
+        if (originatingMethod == null) return name;
 
-		return originatingNewName != null ? originatingNewName : name;
-	}
+        String originatingNewName = tr.methodArgMap.get(originatingMethod.newNameOriginatingCls + "/" + MemberInstance.getMethodId(originatingMethod.name, originatingMethod.desc) + lvIndex);
 
-	public String mapMethodVar(String methodOwner, String methodName, String methodDesc, int lvIndex, int startOpIdx, int asmIndex, String name) {
-		return name; // TODO: implement
-	}
+        return originatingNewName != null ? originatingNewName : name;
+    }
 
-	@Override
-	public String mapAnnotationAttributeName(String descriptor, String name) {
-		throw new RuntimeException("Deprecated function");
-	}
+    public String mapMethodVar(
+        String methodOwner,
+        String methodName,
+        String methodDesc,
+        int lvIndex,
+        int startOpIdx,
+        int asmIndex,
+        String name
+    ) {
+        return name; // TODO: implement
+    }
 
-	@Override
-	public String mapAnnotationAttributeName(final String annotationDesc, final String name, String attributeDesc) {
-		String annotationClass = Type.getType(annotationDesc).getInternalName();
+    @Override
+    public String mapAnnotationAttributeName(String descriptor, String name) {
+        throw new RuntimeException("Deprecated function");
+    }
 
-		if (attributeDesc == null) {
-			return this.mapMethodNamePrefixDesc(annotationClass, name, "()");
-		} else {
-			return this.mapMethodName(annotationClass, name, "()" + attributeDesc);
-		}
-	}
+    @Override
+    public String mapAnnotationAttributeName(final String annotationDesc, final String name, String attributeDesc) {
+        String annotationClass = Type.getType(annotationDesc).getInternalName();
 
-	void finish(String className, ClassVisitor cv) {
-		ClassInstance cls = null;
+        if (attributeDesc == null) {
+            return this.mapMethodNamePrefixDesc(annotationClass, name, "()");
+        } else {
+            return this.mapMethodName(annotationClass, name, "()" + attributeDesc);
+        }
+    }
 
-		if (tr.propagateBridges == LinkedMethodPropagation.COMPATIBLE
-				|| tr.propagateRecordComponents == LinkedMethodPropagation.COMPATIBLE) {
-			cls = getClass(className);
+    void finish(String className, ClassVisitor cv) {
+        ClassInstance cls = null;
 
-			if (cls != null) {
-				BridgeHandler.generateCompatBridges(cls, this, cv);
-			}
-		}
-	}
+        if (tr.propagateBridges == LinkedMethodPropagation.COMPATIBLE
+            || tr.propagateRecordComponents == LinkedMethodPropagation.COMPATIBLE) {
+            cls = getClass(className);
 
-	ClassInstance getClass(String owner) {
-		return context.getClass(owner);
-	}
+            if (cls != null) {
+                BridgeHandler.generateCompatBridges(cls, this, cv);
+            }
+        }
+    }
 
-	final MrjState context;
-	final TinyRemapper tr;
+    ClassInstance getClass(String owner) {
+        return context.getClass(owner);
+    }
 }

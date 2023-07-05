@@ -24,7 +24,12 @@ import net.fabricmc.tinyremapper.extension.mixin.common.data.CommonData;
 import org.objectweb.asm.AnnotationVisitor;
 
 public class RedirectAnnotationVisitor extends CommonInjectionAnnotationVisitor {
-	public RedirectAnnotationVisitor(CommonData data, AnnotationVisitor delegate, boolean remap, ObjectList<String> targets) {
-		super(Annotation.REDIRECT, data, delegate, remap, targets);
-	}
+    public RedirectAnnotationVisitor(
+        CommonData data,
+        AnnotationVisitor delegate,
+        boolean remap,
+        ObjectList<String> targets
+    ) {
+        super(Annotation.REDIRECT, data, delegate, remap, targets);
+    }
 }

@@ -36,71 +36,75 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 public class HardTargetMixinClassVisitor extends ClassVisitor {
-	private final ObjectArrayList<Consumer<CommonData>> tasks;
-	private MxClass _class;
+    private final ObjectArrayList<Consumer<CommonData>> tasks;
+    // @Mixin
+    private final AtomicBoolean remap = new AtomicBoolean();
+    private final ObjectArrayList<String> targets = new ObjectArrayList<>();
+    // @Implements
+    private final ObjectArrayList<SoftInterface> interfaces = new ObjectArrayList<>();
+    private MxClass _class;
 
-	// @Mixin
-	private final AtomicBoolean remap = new AtomicBoolean();
-	private final ObjectArrayList<String> targets = new ObjectArrayList<>();
+    public HardTargetMixinClassVisitor(ObjectArrayList<Consumer<CommonData>> tasks, ClassVisitor delegate) {
+        super(Constant.ASM_VERSION, delegate);
+        this.tasks = Objects.requireNonNull(tasks);
+    }
 
-	// @Implements
-	private final ObjectArrayList<SoftInterface> interfaces = new ObjectArrayList<>();
+    /**
+     * This is called before visitAnnotation.
+     */
+    @Override
+    public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+        this._class = new MxClass(name);
+        super.visit(version, access, name, signature, superName, interfaces);
+    }
 
-	public HardTargetMixinClassVisitor(ObjectArrayList<Consumer<CommonData>> tasks, ClassVisitor delegate) {
-		super(Constant.ASM_VERSION, delegate);
-		this.tasks = Objects.requireNonNull(tasks);
-	}
+    /**
+     * This is called before visitMethod & visitField.
+     */
+    @Override
+    public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+        AnnotationVisitor av = super.visitAnnotation(descriptor, visible);
 
-	/**
-	 * This is called before visitAnnotation.
-	 */
-	@Override
-	public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-		this._class = new MxClass(name);
-		super.visit(version, access, name, signature, superName, interfaces);
-	}
+        if (Annotation.MIXIN.equals(descriptor)) {
+            av = new MixinAnnotationVisitor(av, remap, targets);
+        } else if (Annotation.IMPLEMENTS.equals(descriptor)) {
+            av = new ImplementsAnnotationVisitor(av, interfaces);
+        }
 
-	/**
-	 * This is called before visitMethod & visitField.
-	 */
-	@Override
-	public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-		AnnotationVisitor av = super.visitAnnotation(descriptor, visible);
+        return av;
+    }
 
-		if (Annotation.MIXIN.equals(descriptor)) {
-			av = new MixinAnnotationVisitor(av, remap, targets);
-		} else if (Annotation.IMPLEMENTS.equals(descriptor)) {
-			av = new ImplementsAnnotationVisitor(av, interfaces);
-		}
+    @Override
+    public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
+        FieldVisitor fv = super.visitField(access, name, descriptor, signature, value);
+        MxMember field = _class.getField(name, descriptor);
 
-		return av;
-	}
+        if (targets.isEmpty()) {
+            return fv;
+        } else {
+            return new HardTargetMixinFieldVisitor(tasks, fv, field, remap.get(), Collections.unmodifiableList(targets));
+        }
+    }
 
-	@Override
-	public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
-		FieldVisitor fv = super.visitField(access, name, descriptor, signature, value);
-		MxMember field = _class.getField(name, descriptor);
+    @Override
+    public MethodVisitor visitMethod(
+        int access,
+        String name,
+        String descriptor,
+        String signature,
+        String[] exceptions
+    ) {
+        MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
+        MxMember method = _class.getMethod(name, descriptor);
 
-		if (targets.isEmpty()) {
-			return fv;
-		} else {
-			return new HardTargetMixinFieldVisitor(tasks, fv, field, remap.get(), Collections.unmodifiableList(targets));
-		}
-	}
+        if (!interfaces.isEmpty() && !MapUtility.IGNORED_NAME.contains(name)) {
+            ImplementsAnnotationVisitor.visitMethod(tasks, method, interfaces);
+        }
 
-	@Override
-	public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-		MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
-		MxMember method = _class.getMethod(name, descriptor);
-
-		if (!interfaces.isEmpty() && !MapUtility.IGNORED_NAME.contains(name)) {
-			ImplementsAnnotationVisitor.visitMethod(tasks, method, interfaces);
-		}
-
-		if (targets.isEmpty()) {
-			return mv;
-		} else {
-			return new HardTargetMixinMethodVisitor(tasks, mv, method, remap.get(), ObjectLists.unmodifiable(targets));
-		}
-	}
+        if (targets.isEmpty()) {
+            return mv;
+        } else {
+            return new HardTargetMixinMethodVisitor(tasks, mv, method, remap.get(), ObjectLists.unmodifiable(targets));
+        }
+    }
 }

@@ -30,50 +30,55 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class SoftTargetMixinClassVisitor extends ClassVisitor {
-	private final CommonData data;
-	private MxClass _class;
+    private final CommonData data;
+    // @Mixin
+    private final AtomicBoolean remap = new AtomicBoolean();
+    private final ObjectArrayList<String> targets = new ObjectArrayList<>();
+    private MxClass _class;
 
-	// @Mixin
-	private final AtomicBoolean remap = new AtomicBoolean();
-	private final ObjectArrayList<String> targets = new ObjectArrayList<>();
+    public SoftTargetMixinClassVisitor(CommonData data, ClassVisitor delegate) {
+        super(Constant.ASM_VERSION, delegate);
+        this.data = Objects.requireNonNull(data);
+    }
 
-	public SoftTargetMixinClassVisitor(CommonData data, ClassVisitor delegate) {
-		super(Constant.ASM_VERSION, delegate);
-		this.data = Objects.requireNonNull(data);
-	}
+    /**
+     * This is called before visitAnnotation.
+     */
+    @Override
+    public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
+        this._class = new MxClass(name);
+        super.visit(version, access, name, signature, superName, interfaces);
+    }
 
-	/**
-	 * This is called before visitAnnotation.
-	 */
-	@Override
-	public void visit(int version, int access, String name, String signature, String superName, String[] interfaces) {
-		this._class = new MxClass(name);
-		super.visit(version, access, name, signature, superName, interfaces);
-	}
+    /**
+     * This is called before visitMethod & visitField.
+     */
+    @Override
+    public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
+        AnnotationVisitor av = super.visitAnnotation(descriptor, visible);
 
-	/**
-	 * This is called before visitMethod & visitField.
-	 */
-	@Override
-	public AnnotationVisitor visitAnnotation(String descriptor, boolean visible) {
-		AnnotationVisitor av = super.visitAnnotation(descriptor, visible);
+        if (Annotation.MIXIN.equals(descriptor)) {
+            av = new MixinAnnotationVisitor(data, av, remap, targets);
+        }
 
-		if (Annotation.MIXIN.equals(descriptor)) {
-			av = new MixinAnnotationVisitor(data, av, remap, targets);
-		}
+        return av;
+    }
 
-		return av;
-	}
+    @Override
+    public MethodVisitor visitMethod(
+        int access,
+        String name,
+        String descriptor,
+        String signature,
+        String[] exceptions
+    ) {
+        MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
+        MxMember method = _class.getMethod(name, descriptor);
 
-	@Override
-	public MethodVisitor visitMethod(int access, String name, String descriptor, String signature, String[] exceptions) {
-		MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
-		MxMember method = _class.getMethod(name, descriptor);
-
-		if (targets.isEmpty()) {
-			return mv;
-		} else {
-			return new SoftTargetMixinMethodVisitor(data, mv, method, remap.get(), ObjectLists.unmodifiable(targets));
-		}
-	}
+        if (targets.isEmpty()) {
+            return mv;
+        } else {
+            return new SoftTargetMixinMethodVisitor(data, mv, method, remap.get(), ObjectLists.unmodifiable(targets));
+        }
+    }
 }

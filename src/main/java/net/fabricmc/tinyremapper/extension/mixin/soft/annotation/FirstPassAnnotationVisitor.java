@@ -18,30 +18,29 @@
 
 package net.fabricmc.tinyremapper.extension.mixin.soft.annotation;
 
-import java.util.Objects;
-
-import org.objectweb.asm.tree.AnnotationNode;
-
 import net.fabricmc.tinyremapper.extension.mixin.common.data.AnnotationElement;
 import net.fabricmc.tinyremapper.extension.mixin.common.data.Constant;
+import org.objectweb.asm.tree.AnnotationNode;
+
+import java.util.Objects;
 
 /**
  * The common annotation visitor for first pass.
  */
 public class FirstPassAnnotationVisitor extends AnnotationNode {
-	protected boolean remap;
+    protected boolean remap;
 
-	public FirstPassAnnotationVisitor(String descriptor, boolean remapDefault) {
-		super(Constant.ASM_VERSION, descriptor);
-		remap = remapDefault;
-	}
+    public FirstPassAnnotationVisitor(String descriptor, boolean remapDefault) {
+        super(Constant.ASM_VERSION, descriptor);
+        remap = remapDefault;
+    }
 
-	@Override
-	public void visit(String name, Object value) {
-		if (name.equals(AnnotationElement.REMAP)) {
-			remap = Objects.requireNonNull((Boolean) value);
-		}
+    @Override
+    public void visit(String name, Object value) {
+        if (name.equals(AnnotationElement.REMAP)) {
+            remap = Objects.requireNonNull((Boolean) value);
+        }
 
-		super.visit(name, value);
-	}
+        super.visit(name, value);
+    }
 }

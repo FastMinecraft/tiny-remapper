@@ -24,7 +24,12 @@ import net.fabricmc.tinyremapper.extension.mixin.common.data.CommonData;
 import org.objectweb.asm.AnnotationVisitor;
 
 public class ModifyConstantAnnotationVisitor extends CommonInjectionAnnotationVisitor {
-	public ModifyConstantAnnotationVisitor(CommonData data, AnnotationVisitor delegate, boolean remap, ObjectList<String> targets) {
-		super(Annotation.MODIFY_CONSTANT, data, delegate, remap, targets);
-	}
+    public ModifyConstantAnnotationVisitor(
+        CommonData data,
+        AnnotationVisitor delegate,
+        boolean remap,
+        ObjectList<String> targets
+    ) {
+        super(Annotation.MODIFY_CONSTANT, data, delegate, remap, targets);
+    }
 }

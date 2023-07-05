@@ -41,84 +41,89 @@ import java.util.regex.Pattern;
  * do not lower the first character of the remaining part.
  */
 public class AccessorAnnotationVisitor extends AnnotationVisitor {
-	private final ObjectList<Consumer<CommonData>> tasks;
-	private final MxMember method;
-	private final ObjectList<String> targets;
+    private final ObjectList<Consumer<CommonData>> tasks;
+    private final MxMember method;
+    private final ObjectList<String> targets;
 
-	private boolean remap;
-	private boolean isSoftTarget;
+    private boolean remap;
+    private boolean isSoftTarget;
 
-	public AccessorAnnotationVisitor(ObjectList<Consumer<CommonData>> tasks, AnnotationVisitor delegate, MxMember method, boolean remap, ObjectList<String> targets) {
-		super(Constant.ASM_VERSION, delegate);
+    public AccessorAnnotationVisitor(
+        ObjectList<Consumer<CommonData>> tasks,
+        AnnotationVisitor delegate,
+        MxMember method,
+        boolean remap,
+        ObjectList<String> targets
+    ) {
+        super(Constant.ASM_VERSION, delegate);
 
-		this.tasks = Objects.requireNonNull(tasks);
-		this.method = Objects.requireNonNull(method);
-		this.targets = Objects.requireNonNull(targets);
+        this.tasks = Objects.requireNonNull(tasks);
+        this.method = Objects.requireNonNull(method);
+        this.targets = Objects.requireNonNull(targets);
 
-		this.remap = remap;
-		this.isSoftTarget = false;
-	}
+        this.remap = remap;
+        this.isSoftTarget = false;
+    }
 
-	@Override
-	public void visit(String name, Object value) {
-		if (name.equals(AnnotationElement.REMAP)) {
-			remap = Objects.requireNonNull((Boolean) value);
-		} else if (name.equals(AnnotationElement.VALUE)) {
-			isSoftTarget = true;
-		}
+    @Override
+    public void visit(String name, Object value) {
+        if (name.equals(AnnotationElement.REMAP)) {
+            remap = Objects.requireNonNull((Boolean) value);
+        } else if (name.equals(AnnotationElement.VALUE)) {
+            isSoftTarget = true;
+        }
 
-		super.visit(name, value);
-	}
+        super.visit(name, value);
+    }
 
-	@Override
-	public void visitEnd() {
-		if (remap && !isSoftTarget) {
-			tasks.add(data -> new AccessorMappable(data, method, targets).result());
-		}
+    @Override
+    public void visitEnd() {
+        if (remap && !isSoftTarget) {
+            tasks.add(data -> new AccessorMappable(data, method, targets).result());
+        }
 
-		super.visitEnd();
-	}
+        super.visitEnd();
+    }
 
-	private static class AccessorMappable extends ConvertibleMappable {
-		private final String prefix;
-		private final String fieldDesc;
+    private static class AccessorMappable extends ConvertibleMappable {
+        private static final Pattern GETTER_PATTERN = Pattern.compile("(?<=\\(\\)).*");
+        private static final Pattern SETTER_PATTERN = Pattern.compile("(?<=\\().*(?=\\)V)");
+        private final String prefix;
+        private final String fieldDesc;
 
-		private static final Pattern GETTER_PATTERN = Pattern.compile("(?<=\\(\\)).*");
-		private static final Pattern SETTER_PATTERN = Pattern.compile("(?<=\\().*(?=\\)V)");
+        AccessorMappable(CommonData data, MxMember self, Collection<String> targets) {
+            super(data, self, targets);
 
-		AccessorMappable(CommonData data, MxMember self, Collection<String> targets) {
-			super(data, self, targets);
+            if (self.getName().startsWith("get")) {
+                this.prefix = "get";
+            } else if (self.getName().startsWith("set")) {
+                this.prefix = "set";
+            } else if (self.getName().startsWith("is")) {
+                this.prefix = "is";
+            } else {
+                throw new RuntimeException(String.format("%s does not start with get, set or is.", self.getName()));
+            }
 
-			if (self.getName().startsWith("get")) {
-				this.prefix = "get";
-			} else if (self.getName().startsWith("set")) {
-				this.prefix = "set";
-			} else if (self.getName().startsWith("is")) {
-				this.prefix = "is";
-			} else {
-				throw new RuntimeException(String.format("%s does not start with get, set or is.", self.getName()));
-			}
+            Matcher getterMatcher = GETTER_PATTERN.matcher(self.getDesc());
+            Matcher setterMatcher = SETTER_PATTERN.matcher(self.getDesc());
 
-			Matcher getterMatcher = GETTER_PATTERN.matcher(self.getDesc());
-			Matcher setterMatcher = SETTER_PATTERN.matcher(self.getDesc());
+            if (getterMatcher.find()) {
+                this.fieldDesc = getterMatcher.group();
+            } else if (setterMatcher.find()) {
+                this.fieldDesc = setterMatcher.group();
+            } else {
+                throw new RuntimeException(String.format("%s is not getter or setter descriptor", self.getDesc()));
+            }
+        }
 
-			if (getterMatcher.find()) {
-				this.fieldDesc = getterMatcher.group();
-			} else if (setterMatcher.find()) {
-				this.fieldDesc = setterMatcher.group();
-			} else {
-				throw new RuntimeException(String.format("%s is not getter or setter descriptor", self.getDesc()));
-			}
-		}
+        @Override
+        protected IConvertibleString getName() {
+            return new CamelPrefixString(prefix, self.getName());
+        }
 
-		@Override
-		protected IConvertibleString getName() {
-			return new CamelPrefixString(prefix, self.getName());
-		}
-
-		@Override
-		protected String getDesc() {
-			return fieldDesc;
-		}
-	}
+        @Override
+        protected String getDesc() {
+            return fieldDesc;
+        }
+    }
 }

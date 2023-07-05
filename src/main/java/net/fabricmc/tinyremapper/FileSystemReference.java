@@ -36,111 +36,111 @@ import java.util.Set;
  * invocations are mirrored.
  */
 public final class FileSystemReference implements Closeable {
-	public static FileSystemReference openJar(Path path) throws IOException {
-		return openJar(path, false);
-	}
+    private static final Reference2ObjectMap<FileSystem, ReferenceSet<FileSystemReference>> openFsMap = new Reference2ObjectOpenHashMap<>();
+    private final FileSystem fileSystem;
+    private volatile boolean closed;
 
-	public static FileSystemReference openJar(Path path, boolean create) throws IOException {
-		return open(toJarUri(path), create);
-	}
+    private FileSystemReference(FileSystem fs) {
+        this.fileSystem = fs;
+    }
 
-	private static URI toJarUri(Path path) {
-		URI uri = path.toUri();
+    public static FileSystemReference openJar(Path path) throws IOException {
+        return openJar(path, false);
+    }
 
-		try {
-			return new URI("jar:" + uri.getScheme(), uri.getHost(), uri.getPath(), uri.getFragment());
-		} catch (URISyntaxException e) {
-			throw new RuntimeException("can't convert path "+path+" to uri", e);
-		}
-	}
+    public static FileSystemReference openJar(Path path, boolean create) throws IOException {
+        return open(toJarUri(path), create);
+    }
 
-	public static FileSystemReference open(URI uri) throws IOException {
-		return open(uri, false);
-	}
+    private static URI toJarUri(Path path) {
+        URI uri = path.toUri();
 
-	public static FileSystemReference open(URI uri, boolean create) throws IOException {
-		synchronized (openFsMap) {
-			boolean opened = false;
-			FileSystem fs = null;
+        try {
+            return new URI("jar:" + uri.getScheme(), uri.getHost(), uri.getPath(), uri.getFragment());
+        } catch (URISyntaxException e) {
+            throw new RuntimeException("can't convert path " + path + " to uri", e);
+        }
+    }
 
-			try {
-				fs = FileSystems.getFileSystem(uri);
-			} catch (FileSystemNotFoundException e) {
-				try {
-					fs = FileSystems.newFileSystem(uri, create ? Collections.singletonMap("create", "true") : Collections.emptyMap());
-					opened = true;
-				} catch (FileSystemAlreadyExistsException f) {
-					fs = FileSystems.getFileSystem(uri);
-				}
-			}
+    public static FileSystemReference open(URI uri) throws IOException {
+        return open(uri, false);
+    }
 
-			FileSystemReference ret = new FileSystemReference(fs);
-			ReferenceSet<FileSystemReference> refs = openFsMap.get(fs);
+    public static FileSystemReference open(URI uri, boolean create) throws IOException {
+        synchronized (openFsMap) {
+            boolean opened = false;
+            FileSystem fs = null;
 
-			if (refs == null) {
-				refs = new ReferenceOpenHashSet<>();
-				openFsMap.put(fs, refs);
-				if (!opened) refs.add(null);
-			} else if (opened) {
-				throw new IllegalStateException("opened but already in refs?");
-			}
+            try {
+                fs = FileSystems.getFileSystem(uri);
+            } catch (FileSystemNotFoundException e) {
+                try {
+                    fs = FileSystems.newFileSystem(uri, create ? Collections.singletonMap("create", "true") : Collections.emptyMap());
+                    opened = true;
+                } catch (FileSystemAlreadyExistsException f) {
+                    fs = FileSystems.getFileSystem(uri);
+                }
+            }
 
-			refs.add(ret);
+            FileSystemReference ret = new FileSystemReference(fs);
+            ReferenceSet<FileSystemReference> refs = openFsMap.get(fs);
 
-			return ret;
-		}
-	}
+            if (refs == null) {
+                refs = new ReferenceOpenHashSet<>();
+                openFsMap.put(fs, refs);
+                if (!opened) refs.add(null);
+            } else if (opened) {
+                throw new IllegalStateException("opened but already in refs?");
+            }
 
-	private FileSystemReference(FileSystem fs) {
-		this.fileSystem = fs;
-	}
+            refs.add(ret);
 
-	public boolean isReadOnly() {
-		if (closed) throw new IllegalStateException("fs closed");
+            return ret;
+        }
+    }
 
-		return fileSystem.isReadOnly();
-	}
+    public boolean isReadOnly() {
+        if (closed) throw new IllegalStateException("fs closed");
 
-	public Path getPath(String first, String... more) {
-		if (closed) throw new IllegalStateException("fs closed");
+        return fileSystem.isReadOnly();
+    }
 
-		return fileSystem.getPath(first, more);
-	}
+    public Path getPath(String first, String... more) {
+        if (closed) throw new IllegalStateException("fs closed");
 
-	public FileSystem getFs() {
-		if (closed) throw new IllegalStateException("fs closed");
+        return fileSystem.getPath(first, more);
+    }
 
-		return fileSystem;
-	}
+    public FileSystem getFs() {
+        if (closed) throw new IllegalStateException("fs closed");
 
-	@Override
-	public void close() throws IOException {
-		synchronized (openFsMap) {
-			if (closed) return;
-			closed = true;
+        return fileSystem;
+    }
 
-			Set<FileSystemReference> refs = openFsMap.get(fileSystem);
-			if (refs == null || !refs.remove(this)) throw new IllegalStateException("fs "+fileSystem+" was already closed");
+    @Override
+    public void close() throws IOException {
+        synchronized (openFsMap) {
+            if (closed) return;
+            closed = true;
 
-			if (refs.isEmpty()) {
-				openFsMap.remove(fileSystem);
-				fileSystem.close();
-			} else if (refs.size() == 1 && refs.contains(null)) { // only null -> not opened by us, just abandon
-				openFsMap.remove(fileSystem);
-			}
-		}
-	}
+            Set<FileSystemReference> refs = openFsMap.get(fileSystem);
+            if (refs == null || !refs.remove(this))
+                throw new IllegalStateException("fs " + fileSystem + " was already closed");
 
-	@Override
-	public String toString() {
-		synchronized (openFsMap) {
-			ReferenceSet<FileSystemReference> refs = openFsMap.getOrDefault(fileSystem, ReferenceSets.emptySet());
-			return String.format("%s=%dx,%s", fileSystem, refs.size(), refs.contains(null) ? "existing" : "new");
-		}
-	}
+            if (refs.isEmpty()) {
+                openFsMap.remove(fileSystem);
+                fileSystem.close();
+            } else if (refs.size() == 1 && refs.contains(null)) { // only null -> not opened by us, just abandon
+                openFsMap.remove(fileSystem);
+            }
+        }
+    }
 
-	private static final Reference2ObjectMap<FileSystem, ReferenceSet<FileSystemReference>> openFsMap = new Reference2ObjectOpenHashMap<>();
-
-	private final FileSystem fileSystem;
-	private volatile boolean closed;
+    @Override
+    public String toString() {
+        synchronized (openFsMap) {
+            ReferenceSet<FileSystemReference> refs = openFsMap.getOrDefault(fileSystem, ReferenceSets.emptySet());
+            return String.format("%s=%dx,%s", fileSystem, refs.size(), refs.contains(null) ? "existing" : "new");
+        }
+    }
 }
